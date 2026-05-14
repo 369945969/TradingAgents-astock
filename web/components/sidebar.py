@@ -9,6 +9,21 @@ import streamlit as st
 from web.history import get_history
 
 
+def _resolve_user_input(raw: str) -> tuple[str, str | None]:
+    """Resolve raw user input to (ticker_code, error_msg).
+
+    Accepts 6-digit codes or Chinese stock names (e.g. '宝光股份').
+    Returns (code, None) on success or ("", error_msg) on failure.
+    """
+    from tradingagents.dataflows.a_stock import resolve_ticker
+
+    try:
+        code = resolve_ticker(raw)
+        return code, None
+    except ValueError as e:
+        return "", str(e)
+
+
 def render_sidebar() -> None:
     """Render the sidebar with input controls and history."""
 
@@ -32,9 +47,9 @@ def render_sidebar() -> None:
 
     ticker = st.text_input(
         "股票代码",
-        placeholder="例: 300750",
+        placeholder="例: 300750 或 宁德时代",
         key="input_ticker",
-        help="输入6位A股代码",
+        help="输入6位A股代码或中文股票全称",
     )
 
     trade_date = st.date_input(
@@ -52,11 +67,17 @@ def render_sidebar() -> None:
         disabled=is_busy or not ticker,
         type="primary",
     ):
-        st.session_state["start_analysis"] = {
-            "ticker": ticker.strip(),
-            "trade_date": trade_date.strftime("%Y-%m-%d"),
-        }
-        st.session_state["viewing_history"] = None
+        resolved_code, err = _resolve_user_input(ticker)
+        if err:
+            st.error(f"❌ {err}")
+        else:
+            if resolved_code != ticker.strip():
+                st.success(f"✅ {ticker.strip()} → {resolved_code}")
+            st.session_state["start_analysis"] = {
+                "ticker": resolved_code,
+                "trade_date": trade_date.strftime("%Y-%m-%d"),
+            }
+            st.session_state["viewing_history"] = None
 
     st.markdown("---")
     st.markdown("#### 历史记录")

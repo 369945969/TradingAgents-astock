@@ -6,19 +6,26 @@ into TradingAgents' plugin architecture. 12 vendor methods implemented.
 Data sources:
 - mootdx (TCP 7709): OHLCV K-lines, financial snapshots, F10 text
 - Tencent Finance (HTTP GBK): PE/PB/market cap/turnover
-- akshare (Python): news, financial statements, stock info, consensus EPS
+- akshare (Python): financial statements, stock info, consensus EPS
+- 东方财富 (direct HTTP): individual stock news
+- 新浪财经 (HTTP): stock news (backup)
 - 同花顺 (HTTP): hot stocks topic attribution, northbound capital flow
 """
+
+from __future__ import annotations
 
 from typing import Annotated
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+import json as _json
 import os
 import logging
 import math
+import re as _re
 import urllib.request
 
 import pandas as pd
+import requests as _requests
 
 from .utils import safe_ticker_component
 
@@ -55,6 +62,77 @@ def _normalize_ticker(symbol: str) -> str:
             s = s[len(prefix) :]
             break
     return safe_ticker_component(s)
+
+
+# ---------------------------------------------------------------------------
+# Stock name <-> code mapping (cached)
+# ---------------------------------------------------------------------------
+
+_name_to_code: dict[str, str] | None = None
+_code_to_name: dict[str, str] | None = None
+
+
+def _build_name_code_map() -> tuple[dict[str, str], dict[str, str]]:
+    """Build name→code and code→name maps via mootdx (both SH & SZ markets)."""
+    global _name_to_code, _code_to_name
+    if _name_to_code is not None:
+        return _name_to_code, _code_to_name
+
+    from mootdx.quotes import Quotes
+
+    client = Quotes.factory(market="std")
+    n2c: dict[str, str] = {}
+    c2n: dict[str, str] = {}
+
+    for market in (0, 1):  # 0=SZ, 1=SH
+        stocks = client.stocks(market=market)
+        if stocks is None or stocks.empty:
+            continue
+        for _, row in stocks.iterrows():
+            code = str(row["code"]).strip()
+            name = str(row["name"]).strip()
+            if not _re.match(r"^[036]\d{5}$", code):
+                continue
+            clean_name = name.replace(" ", "").replace("　", "")
+            n2c[clean_name] = code
+            c2n[code] = clean_name
+
+    _name_to_code = n2c
+    _code_to_name = c2n
+    logger.info("Built stock name-code map: %d entries", len(n2c))
+    return _name_to_code, _code_to_name
+
+
+def resolve_ticker(user_input: str) -> str:
+    """Resolve user input (code or Chinese name) to a 6-digit A-stock code.
+
+    Accepts: '600379', 'SH600379', '600379.SH', '宝光股份'
+    Returns: '600379'
+    Raises: ValueError if not resolvable.
+    """
+    s = user_input.strip()
+    if not s:
+        raise ValueError("输入不能为空")
+
+    has_chinese = any("一" <= ch <= "鿿" for ch in s)
+
+    if not has_chinese:
+        return _normalize_ticker(s)
+
+    clean = s.replace(" ", "").replace("　", "")
+    n2c, _ = _build_name_code_map()
+
+    if clean in n2c:
+        return n2c[clean]
+
+    matches = {name: code for name, code in n2c.items() if clean in name}
+    if len(matches) == 1:
+        return next(iter(matches.values()))
+    if len(matches) > 1:
+        examples = ", ".join(f"{n}({c})" for n, c in list(matches.items())[:5])
+        raise ValueError(f"'{s}' 匹配到多只股票: {examples}，请输入完整名称或代码")
+
+    raise ValueError(f"找不到股票 '{s}'，请检查名称是否正确")
 
 
 # ---------------------------------------------------------------------------
@@ -624,67 +702,160 @@ def get_income_statement(
 # ---- 7. get_news ----
 
 
+def _fetch_news_eastmoney(code: str, page_size: int = 20) -> list[dict]:
+    """Direct East Money search API for individual stock news."""
+    url = "https://search-api-web.eastmoney.com/search/jsonp"
+    inner_param = {
+        "uid": "",
+        "keyword": code,
+        "type": ["cmsArticleWebOld"],
+        "client": "web",
+        "clientType": "web",
+        "clientVersion": "curr",
+        "param": {
+            "cmsArticleWebOld": {
+                "searchScope": "default",
+                "sort": "default",
+                "pageIndex": 1,
+                "pageSize": page_size,
+                "preTag": "",
+                "postTag": "",
+            }
+        },
+    }
+    params = {
+        "cb": "callback",
+        "param": _json.dumps(inner_param, ensure_ascii=False),
+        "_": "1",
+    }
+    headers = {
+        "Referer": "https://so.eastmoney.com/",
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+        ),
+    }
+
+    resp = _requests.get(url, params=params, headers=headers, timeout=15)
+    resp.raise_for_status()
+    text = resp.text
+    text = text[text.index("(") + 1 : text.rindex(")")]
+    data = _json.loads(text)
+
+    articles: list[dict] = []
+    for item in data.get("result", {}).get("cmsArticleWebOld", []):
+        articles.append({
+            "title": item.get("title", ""),
+            "content": item.get("content", ""),
+            "time": item.get("date", ""),
+            "source": item.get("mediaName", "东方财富"),
+            "url": item.get("url", ""),
+        })
+    return articles
+
+
+def _fetch_news_sina(code: str, page_size: int = 20) -> list[dict]:
+    """Sina Finance stock news API (backup source)."""
+    prefix = "sh" if code.startswith(("6", "9")) else "sz"
+    url = (
+        f"https://vip.stock.finance.sina.com.cn/corp/view/"
+        f"vCB_AllNewsStock.php?symbol={prefix}{code}&Page=1"
+    )
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+        ),
+        "Referer": "https://finance.sina.com.cn/",
+    }
+
+    resp = _requests.get(url, headers=headers, timeout=15)
+    resp.raise_for_status()
+    resp.encoding = "gb2312"
+    html = resp.text
+
+    articles: list[dict] = []
+    rows = _re.findall(
+        r"(\d{4}-\d{2}-\d{2})\s*(?:&nbsp;)*(\d{2}:\d{2})\s*(?:&nbsp;)*"
+        r"<a[^>]+href='([^']+)'[^>]*>([^<]+)</a>",
+        html,
+    )
+    for date_str, time_str, link, title in rows[:page_size]:
+        articles.append({
+            "title": title.strip(),
+            "content": "",
+            "time": f"{date_str} {time_str}",
+            "source": "新浪财经",
+            "url": link,
+        })
+    return articles
+
+
 def get_news(
     ticker: Annotated[str, "A-stock code"],
     start_date: Annotated[str, "Start date yyyy-mm-dd"],
     end_date: Annotated[str, "End date yyyy-mm-dd"],
 ) -> str:
-    """Get stock-specific news via akshare (eastmoney source)."""
-    import akshare as ak
-
+    """Get stock-specific news via East Money direct API (Sina as fallback)."""
     code = _normalize_ticker(ticker)
 
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+    articles: list[dict] = []
+    source_label = ""
+
     try:
-        df = ak.stock_news_em(symbol=code)
+        articles = _fetch_news_eastmoney(code)
+        source_label = "东方财富"
+    except Exception as e:
+        logger.warning("East Money news fetch failed for %s: %s", code, e)
 
-        if df is None or df.empty:
-            return f"No news found for A-stock '{code}'"
+    if not articles:
+        try:
+            articles = _fetch_news_sina(code)
+            source_label = "新浪财经"
+        except Exception as e:
+            logger.warning("Sina news fetch failed for %s: %s", code, e)
 
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    if not articles:
+        return f"No news found for A-stock '{code}'"
 
-        news_str = ""
-        count = 0
+    news_str = ""
+    count = 0
+    for art in articles:
+        pub_time = art.get("time", "")
+        try:
+            pub_dt = datetime.strptime(pub_time[:10], "%Y-%m-%d")
+            if pub_dt < start_dt or pub_dt > end_dt:
+                continue
+        except (ValueError, IndexError):
+            pass
 
-        for _, row in df.iterrows():
-            title = str(row.get("新闻标题", row.get("title", "")))
-            content = str(row.get("新闻内容", row.get("content", "")))
-            pub_time = str(row.get("发布时间", row.get("datetime", "")))
-            source = str(row.get("文章来源", row.get("source", "Unknown")))
-            link = str(row.get("新闻链接", row.get("url", "")))
+        title = art["title"]
+        content = art.get("content", "")
+        source = art.get("source", source_label)
+        link = art.get("url", "")
 
-            # Date filter
-            try:
-                pub_dt = datetime.strptime(pub_time[:10], "%Y-%m-%d")
-                if pub_dt < start_dt or pub_dt > end_dt:
-                    continue
-            except (ValueError, IndexError):
-                pass  # Include if date can't be parsed
+        news_str += f"### {title} (source: {source})\n"
+        if content:
+            snippet = content[:300] + "..." if len(content) > 300 else content
+            news_str += f"{snippet}\n"
+        if link and link != "nan":
+            news_str += f"Link: {link}\n"
+        news_str += "\n"
+        count += 1
 
-            news_str += f"### {title} (source: {source})\n"
-            if content:
-                snippet = (
-                    content[:300] + "..." if len(content) > 300 else content
-                )
-                news_str += f"{snippet}\n"
-            if link and link != "nan":
-                news_str += f"Link: {link}\n"
-            news_str += "\n"
-            count += 1
-
-        if count == 0:
-            return (
-                f"No news found for A-stock '{code}' "
-                f"between {start_date} and {end_date}"
-            )
-
+    if count == 0:
         return (
-            f"## {code} (A-stock) News, from {start_date} to {end_date}:\n\n"
-            + news_str
+            f"No news found for A-stock '{code}' "
+            f"between {start_date} and {end_date}"
         )
 
-    except Exception as e:
-        return f"Error fetching news for A-stock {code}: {str(e)}"
+    return (
+        f"## {code} (A-stock) News, from {start_date} to {end_date}:\n\n"
+        + news_str
+    )
 
 
 # ---- 8. get_global_news ----
