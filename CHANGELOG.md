@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Breaking changes within the 0.x line are called out explicitly.
 
+## [0.2.7] — 2026-05-19
+
+### Fixed
+
+- **百度 PAE 资金流下线**：`fundflow` + `fundsortlist` 接口已返回空，
+  `get_fund_flow()` 全部替换为东财 push2 资金流 API（分钟级 + 日级 20 天）
+- **龙虎榜机构动向**：`RPT_ORGANIZATION_BUSSINESS` 报表配置已下线，
+  改用 BUY/SELL 席位明细筛选 `OPERATEDEPT_CODE="0"`（机构专用席位）
+- **东财全球资讯**：新增必填参数 `req_trace`（UUID），否则返回 403
+
+---
+
 ## [0.2.6] — 2026-05-19
 
 ### Fixed

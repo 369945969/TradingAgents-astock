@@ -22,6 +22,7 @@ import os
 import logging
 import math
 import re as _re
+import uuid
 import urllib.request
 
 import pandas as pd
@@ -1080,6 +1081,7 @@ def get_global_news(
             "fastColumn": "102",
             "sortEnd": "",
             "pageSize": str(limit),
+            "req_trace": str(uuid.uuid4()),
         }
         em_headers = {"User-Agent": _UA, "Referer": "https://kuaixun.eastmoney.com/"}
         r_em = _requests.get(em_url, params=em_params, headers=em_headers, timeout=10)
@@ -1603,108 +1605,107 @@ def get_fund_flow(
         bool, "Include historical daily fund flow (last 20 days)"
     ] = True,
 ) -> str:
-    """Get individual stock fund flow from 百度股市通.
+    """Get individual stock fund flow from 东财 push2.
 
-    Realtime: minute-level main force vs retail investor flow.
-    History: daily super/large/medium/small order net inflow for 20 days.
+    Realtime: minute-level main/large/medium/small/super order net inflow.
+    History: daily net inflow for 20 trading days (push2his).
+
+    V0.2.7: replaced 百度 PAE (fundflow/fundsortlist, offline since 2026-05)
+    with 东财 push2 fund flow API.
     """
-    import requests
+    import requests as _req
 
     code = _normalize_ticker(ticker)
+    secid = f"1.{code}" if code.startswith("6") else f"0.{code}"
     lines = [
         f"# Fund Flow for {code} (A-stock)",
-        f"# Source: 百度股市通 (Baidu PAE)",
+        f"# Source: 东财 push2 (Eastmoney)",
         f"# Retrieved: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
     ]
 
     try:
         # Realtime minute-level fund flow
-        url_rt = (
-            "https://finance.pae.baidu.com/vapi/v1/fundflow"
-            f"?finance_type=stock&fund_flow_type=&type=stock"
-            f"&market=ab&code={code}&belongs=stocklevelone"
-            "&finClientType=pc"
-        )
-        r = requests.get(url_rt, headers=_BAIDU_PAE_HEADERS, timeout=10)
+        url_rt = "https://push2.eastmoney.com/api/qt/stock/fflow/kline/get"
+        params_rt = {
+            "secid": secid, "klt": 1,
+            "fields1": "f1,f2,f3,f7",
+            "fields2": "f51,f52,f53,f54,f55,f56,f57",
+        }
+        r = _req.get(url_rt, params=params_rt, timeout=10)
         d = r.json()
+        klines = d.get("data", {}).get("klines", [])
 
-        if str(d.get("ResultCode", -1)) == "0":
-            content = d.get("Result", {}).get("content", {})
-            ff = content.get("fundFlowMinute", {})
-            data_str = ff.get("data", "")
-            rows = data_str.split(";") if data_str else []
-
-            if rows:
-                lines.append(
-                    "## Realtime Minute Flow "
-                    "(mainForce vs retailInvestor, 万元)"
-                )
-                for row in rows[-10:]:
-                    parts = row.split(",")
-                    if len(parts) >= 8:
-                        lines.append(
-                            f"  {parts[0]}: "
-                            f"主力={parts[2]} 散户={parts[3]} "
-                            f"超大单={parts[4]} 大单={parts[5]} "
-                            f"price={parts[8] if len(parts) > 8 else ''}"
-                        )
-
-                last_row = rows[-1].split(",")
-                if len(last_row) >= 4:
-                    main_force = float(last_row[2])
-                    lines.append(
-                        f"\nClose: mainForce={last_row[2]}万 "
-                        f"retail={last_row[3]}万"
-                    )
-                    if main_force > 0:
-                        lines.append(
-                            "Signal: Net main force INFLOW (bullish)"
-                        )
-                    elif main_force < 0:
-                        lines.append(
-                            "Signal: Net main force OUTFLOW (bearish)"
-                        )
-            else:
-                lines.append(
-                    "No realtime fund flow (non-trading hours or holiday)"
-                )
-
-        # Historical daily fund flow
-        if include_history:
-            date_compact = curr_date.replace("-", "")
-            url_hist = (
-                "https://finance.pae.baidu.com/vapi/v1/fundsortlist"
-                f"?code={code}&market=ab&finance_type=stock"
-                f"&tab=day&from=history&date={date_compact}"
-                "&pn=0&rn=20&finClientType=pc"
+        if klines:
+            lines.append(
+                "## Realtime Minute Flow "
+                "(主力/小单/中单/大单/超大单 净流入, 元)"
             )
-            rh = requests.get(
-                url_hist, headers=_BAIDU_PAE_HEADERS, timeout=10
+            for line in klines[-10:]:
+                parts = line.split(",")
+                if len(parts) >= 6:
+                    lines.append(
+                        f"  {parts[0]}: "
+                        f"主力={float(parts[1])/1e4:.0f}万 "
+                        f"大单={float(parts[4])/1e4:.0f}万 "
+                        f"超大单={float(parts[5])/1e4:.0f}万"
+                    )
+
+            last_parts = klines[-1].split(",")
+            if len(last_parts) >= 2:
+                main_net = float(last_parts[1])
+                lines.append(
+                    f"\nClose: 主力净流入={main_net/1e4:.0f}万元"
+                )
+                if main_net > 0:
+                    lines.append(
+                        "Signal: Net main force INFLOW (bullish)"
+                    )
+                elif main_net < 0:
+                    lines.append(
+                        "Signal: Net main force OUTFLOW (bearish)"
+                    )
+        else:
+            lines.append(
+                "No realtime fund flow (non-trading hours or holiday)"
+            )
+
+        # Historical daily fund flow (push2his)
+        if include_history:
+            url_hist = (
+                "https://push2his.eastmoney.com"
+                "/api/qt/stock/fflow/daykline/get"
+            )
+            params_hist = {
+                "secid": secid, "lmt": 20, "klt": 101,
+                "fields1": "f1,f2,f3,f7",
+                "fields2": "f51,f52,f53,f54,f55,f56,f57",
+            }
+            rh = _req.get(
+                url_hist, params=params_hist, timeout=10
             )
             dh = rh.json()
+            hist_klines = dh.get("data", {}).get("klines", [])
 
-            if dh.get("ResultCode", -1) == 0:
-                hist = dh.get("Result", {}).get("content", [])
-                if hist:
-                    lines.append(
-                        f"\n## Historical Daily Fund Flow "
-                        f"(last {len(hist)} trading days)"
-                    )
-                    lines.append(
-                        "Date | Close | Change | SuperBig | Large "
-                        "| Medium | Small | MainForce"
-                    )
-                    for row in hist:
+            if hist_klines:
+                lines.append(
+                    f"\n## Historical Daily Fund Flow "
+                    f"(last {len(hist_klines)} trading days)"
+                )
+                lines.append(
+                    "Date | 主力净流入(万) | 大单(万) "
+                    "| 中单(万) | 小单(万) | 超大单(万)"
+                )
+                for line in hist_klines:
+                    parts = line.split(",")
+                    if len(parts) >= 6:
                         lines.append(
-                            f"  {row.get('showtime', '')} "
-                            f"| {row.get('closepx', '')} "
-                            f"| {row.get('ratio', '')} "
-                            f"| super={row.get('superNetIn', '')} "
-                            f"| large={row.get('largeNetIn', '')} "
-                            f"| med={row.get('mediumNetIn', '')} "
-                            f"| small={row.get('littleNetIn', '')} "
-                            f"| main={row.get('extMainIn', '')}"
+                            f"  {parts[0]} "
+                            f"| main={float(parts[1])/1e4:.0f} "
+                            f"| large={float(parts[4])/1e4:.0f} "
+                            f"| mid={float(parts[3])/1e4:.0f} "
+                            f"| small={float(parts[2])/1e4:.0f} "
+                            f"| super={float(parts[5])/1e4:.0f}"
                         )
 
         return "\n".join(lines)
@@ -1817,22 +1818,23 @@ def get_dragon_tiger_board(
     except Exception:
         pass
 
-    # 3. 机构动向 — eastmoney datacenter direct HTTP
+    # 3. 机构动向 — 从买卖席位明细筛选机构专用席位 (OPERATEDEPT_CODE="0")
     try:
-        inst_data = _eastmoney_datacenter(
-            "RPT_ORGANIZATION_BUSSINESS",
-            filter_str=f"(SECURITY_CODE=\"{code}\")",
-            page_size=1,
-            sort_columns="TRADE_DATE",
-            sort_types="-1",
-        )
-        if inst_data:
-            row = inst_data[0]
+        inst_buy = 0.0
+        inst_sell = 0.0
+        for detail, side in [(buy_data, "buy"), (sell_data, "sell")]:
+            for row in (detail or []):
+                if str(row.get("OPERATEDEPT_CODE", "")) == "0":
+                    if side == "buy":
+                        inst_buy += (row.get("BUY") or 0)
+                    else:
+                        inst_sell += (row.get("SELL") or 0)
+        if inst_buy > 0 or inst_sell > 0:
             lines.append("\n## 机构动向")
             lines.append(
-                f"  机构买入 {row.get('BUY_TIMES', 0)} 家 "
-                f"| 卖出 {row.get('SELL_TIMES', 0)} 家 "
-                f"| 净额 {round((row.get('NET_BUY_AMT') or 0) / 10000, 1):.0f} 万"
+                f"  机构买入 {inst_buy/1e4:.0f} 万 "
+                f"| 卖出 {inst_sell/1e4:.0f} 万 "
+                f"| 净额 {(inst_buy - inst_sell)/1e4:.0f} 万"
             )
     except Exception:
         pass
