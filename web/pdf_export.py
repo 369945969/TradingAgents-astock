@@ -150,9 +150,9 @@ class _ReportPDF(FPDF):
         self._safe_multi_cell(0, 12, "A股多Agent投研分析报告", align="C")
         self.ln(20)
 
-        self._use_font("B", 28)
+        self._use_font("B", 36)
         self.set_text_color(30, 30, 30)
-        self._safe_multi_cell(0, 14, self.ticker, align="C")
+        self._safe_multi_cell(0, 18, self.ticker, align="C")
         self.ln(16)
 
         self._use_font("", 14)
@@ -163,9 +163,9 @@ class _ReportPDF(FPDF):
         self.ln(20)
 
         r, g, b = _signal_color(self.signal)
-        self._use_font("B", 32)
+        self._use_font("B", 40)
         self.set_text_color(r, g, b)
-        self._safe_multi_cell(0, 16, self.signal.upper(), align="C")
+        self._safe_multi_cell(0, 20, self.signal.upper(), align="C")
         self.ln(20)
 
         self._use_font("", 9)
@@ -239,7 +239,7 @@ class _ReportPDF(FPDF):
                 self._use_font("", 10)
                 self.set_text_color(40, 40, 40)
                 if re.match(r"^[-*]\s", stripped):
-                    bullet = "  -  "
+                    bullet = "  \u2022  "
                     body = stripped[2:].strip()
                 else:
                     m = re.match(r"^(\d+[.)])\s*(.*)", stripped)
@@ -258,22 +258,8 @@ class _ReportPDF(FPDF):
                 self._use_font("", 8)
                 self.set_text_color(60, 60, 60)
                 cells = [c.strip() for c in stripped.strip("|").split("|")]
-                col_count = len(cells)
-                if col_count > 0:
-                    avail_w = self.w - self.l_margin - self.r_margin
-                    col_w = avail_w / col_count
-                    for ci, cell_text in enumerate(cells):
-                        cell_text = _strip_md_inline(cell_text)
-                        if ci > 0:
-                            self.set_x(self.l_margin + col_w * ci)
-                        try:
-                            self.multi_cell(col_w, 4.5, cell_text)
-                        except Exception:
-                            try:
-                                self.multi_cell(col_w, 4.5, cell_text[:30])
-                            except Exception:
-                                pass
-                    self.ln(2)
+                row_text = "  |  ".join(_strip_md_inline(c) for c in cells)
+                self._safe_multi_cell(0, 4.5, row_text)
                 i += 1
                 continue
 
