@@ -98,29 +98,41 @@ clean_pycache() {
 setup_sandbox() {
     log "检查沙箱环境..."
     
+    # 优先检测系统 Python
+    local SYS_PYTHON=""
+    if command -v python3 &>/dev/null; then
+        SYS_PYTHON="python3"
+    elif command -v python &>/dev/null; then
+        SYS_PYTHON="python"
+    fi
+    
+    if [[ -z "${SYS_PYTHON}" ]]; then
+        log "${RED}未找到 Python，请先安装 Python 3${NC}"
+        exit 1
+    fi
+    
+    log "系统 Python: ${SYS_PYTHON} ($(${SYS_PYTHON} --version 2>&1))"
+    
+    # 尝试创建虚拟环境
     if [[ ! -d "${VENV_DIR}" ]]; then
         log "${YELLOW}创建虚拟环境...${NC}"
-        if ! python3 -m venv "${VENV_DIR}" 2>/dev/null; then
-            log "${YELLOW}python3 -m venv 失败，尝试使用 python...${NC}"
-            if ! python -m venv "${VENV_DIR}" 2>/dev/null; then
-                log "${YELLOW}虚拟环境创建失败，使用系统 Python${NC}"
-                PYTHON_BIN="$(which python3 2>/dev/null || which python 2>/dev/null)"
-                if [[ -z "${PYTHON_BIN}" ]]; then
-                    log "${RED}未找到 Python，请先安装 Python 3${NC}"
-                    exit 1
-                fi
-                log "${GREEN}使用系统 Python: ${PYTHON_BIN}${NC}"
-            fi
+        if ${SYS_PYTHON} -m venv "${VENV_DIR}"; then
+            log "${GREEN}虚拟环境创建成功${NC}"
+        else
+            log "${YELLOW}虚拟环境创建失败，使用系统 Python${NC}"
+            PYTHON_BIN="${SYS_PYTHON}"
         fi
     fi
     
+    # 确定 Python 路径
     if [[ -z "${PYTHON_BIN}" || ! -f "${PYTHON_BIN}" ]]; then
         PYTHON_BIN="${VENV_DIR}/bin/python"
     fi
     
+    # 如果虚拟环境 Python 不存在，回退到系统 Python
     if [[ ! -f "${PYTHON_BIN}" ]]; then
-        log "${RED}Python 不存在: ${PYTHON_BIN}${NC}"
-        exit 1
+        log "${YELLOW}虚拟环境 Python 不存在，回退到系统 Python${NC}"
+        PYTHON_BIN="${SYS_PYTHON}"
     fi
     
     log "使用 Python: ${PYTHON_BIN}"
