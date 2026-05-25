@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -342,13 +343,12 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
         if final_decision:
             pdf.add_section("最终决策", _strip_think(str(final_decision)))
 
-        result = pdf.output(dest="S")
-        if isinstance(result, bytes):
-            return result
-        if isinstance(result, bytearray):
-            return bytes(result)
-        if isinstance(result, str):
-            return result.encode("latin-1")
-        return bytes(result)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            pdf.output(name=tmp_path)
+            return Path(tmp_path).read_bytes()
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
     except Exception as e:
         raise RuntimeError(f"PDF 生成失败: {e}") from e
