@@ -222,10 +222,10 @@ def test_think_tag_stripping():
     global all_passed
     name = "Think标签过滤"
     try:
+        think_content = "<think>\n这是AI思考过程，应该被过滤掉。\n分析步骤：1.查看数据 2.对比指标\n</think>\n\n买入信号确认，仓位30%。"
         final_state = {
             "market_report": "正常文本内容。",
-            "investment_plan": """
-买入信号确认，仓位30%。""",
+            "investment_plan": think_content,
         }
         pdf_bytes = generate_pdf(final_state, "600519", "2026-05-25", "BUY")
         out = Path(__file__).resolve().parent / "test_output_think.pdf"

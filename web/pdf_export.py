@@ -345,6 +345,11 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
         if final_decision:
             pdf.add_section("最终决策", _strip_think(str(final_decision)))
 
-        return bytes(pdf.output())
+        result = pdf.output()
+        if isinstance(result, bytes):
+            return result
+        if isinstance(result, bytearray):
+            return bytes(result)
+        return result.encode("latin-1")
     except Exception as e:
         raise RuntimeError(f"PDF 生成失败: {e}") from e
