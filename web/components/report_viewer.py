@@ -86,9 +86,9 @@ def render_report(
                 mime="application/pdf",
                 use_container_width=True,
             )
-        except RuntimeError as e:
-            st.caption("📄 PDF 不可用（缺少中文字体）")
-            with st.expander("查看字体安装说明"):
+        except Exception as e:
+            st.caption("📄 PDF 生成不可用")
+            with st.expander("查看详情"):
                 st.code(str(e))
 
     st.markdown("---")
