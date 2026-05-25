@@ -93,55 +93,73 @@ class _ReportPDF(FPDF):
         else:
             self.set_font("Helvetica", style, size)
 
+    def _safe_multi_cell(self, w, h, txt, **kwargs) -> None:
+        try:
+            self.multi_cell(w, h, txt, **kwargs)
+        except Exception:
+            safe = txt[:200] if len(txt) > 200 else txt
+            try:
+                self.multi_cell(w, h, safe, **kwargs)
+            except Exception:
+                pass
+
+    def _safe_cell(self, w, h, txt, **kwargs) -> None:
+        try:
+            self.cell(w, h, txt, **kwargs)
+        except Exception:
+            pass
+
     def header(self) -> None:
+        self.set_x(self.l_margin)
         self._use_font("", 8)
         self.set_text_color(150, 150, 150)
-        self.cell(0, 6, f"A股多Agent投研分析  |  {self.ticker}  |  {self.trade_date}", align="C")
-        self.ln(8)
+        self._safe_multi_cell(0, 6, f"A股多Agent投研分析  |  {self.ticker}  |  {self.trade_date}", align="C")
         self.set_draw_color(60, 60, 60)
-        self.line(10, self.get_y(), self.w - 10, self.get_y())
+        self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
         self.ln(4)
 
     def footer(self) -> None:
         self.set_y(-15)
+        self.set_x(self.l_margin)
         self._use_font("", 8)
         self.set_text_color(120, 120, 120)
-        self.cell(0, 5, f"Page {self.page_no()}/{{nb}}", align="C")
+        self._safe_cell(0, 5, f"Page {self.page_no()}/{{nb}}", align="C")
         self.ln(4)
         self._use_font("", 6)
         self.set_text_color(160, 160, 160)
-        self.cell(0, 4, "仅供学习研究，不构成投资建议", align="C")
+        self._safe_cell(0, 4, "仅供学习研究，不构成投资建议", align="C")
 
     def add_cover(self) -> None:
         self.add_page()
+        self.set_x(self.l_margin)
         self.ln(60)
 
         self._use_font("B", 24)
         self.set_text_color(255, 90, 31)
-        self.cell(0, 12, "A股多Agent投研分析报告", align="C")
+        self._safe_multi_cell(0, 12, "A股多Agent投研分析报告", align="C")
         self.ln(20)
 
-        self._use_font("B", 36)
+        self._use_font("B", 28)
         self.set_text_color(30, 30, 30)
-        self.cell(0, 18, self.ticker, align="C")
+        self._safe_multi_cell(0, 14, self.ticker, align="C")
         self.ln(16)
 
         self._use_font("", 14)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 10, f"分析日期: {self.trade_date}", align="C")
+        self._safe_multi_cell(0, 10, f"分析日期: {self.trade_date}", align="C")
         self.ln(8)
-        self.cell(0, 10, f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+        self._safe_multi_cell(0, 10, f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
         self.ln(20)
 
         r, g, b = _signal_color(self.signal)
-        self._use_font("B", 40)
+        self._use_font("B", 32)
         self.set_text_color(r, g, b)
-        self.cell(0, 20, self.signal.upper(), align="C")
+        self._safe_multi_cell(0, 16, self.signal.upper(), align="C")
         self.ln(20)
 
         self._use_font("", 9)
         self.set_text_color(120, 120, 120)
-        self.multi_cell(
+        self._safe_multi_cell(
             0, 5,
             "免责声明: 本报告由 AI 多 Agent 系统自动生成, 仅供学习研究与技术演示, "
             "不构成任何投资建议。投资决策请咨询持牌专业机构。"
@@ -151,16 +169,16 @@ class _ReportPDF(FPDF):
 
     def add_section(self, title: str, content: str) -> None:
         self.add_page()
+        self.set_x(self.l_margin)
         self._use_font("B", 16)
         self.set_text_color(255, 90, 31)
-        self.cell(0, 10, title)
+        self._safe_multi_cell(0, 10, title)
         self.ln(12)
 
         cleaned = _strip_think(content)
         self._render_markdown(cleaned)
 
     def _render_markdown(self, text: str) -> None:
-        """Render markdown-formatted text with basic styling."""
         lines = text.split("\n")
         i = 0
         while i < len(lines):
@@ -172,72 +190,82 @@ class _ReportPDF(FPDF):
                 i += 1
                 continue
 
-            # Headings
             if stripped.startswith("###"):
+                self.set_x(self.l_margin)
                 self._use_font("B", 11)
                 self.set_text_color(50, 50, 50)
-                self.multi_cell(0, 7, stripped.lstrip("#").strip())
+                self._safe_multi_cell(0, 7, stripped.lstrip("#").strip())
                 self.ln(4)
                 i += 1
                 continue
             if stripped.startswith("##"):
+                self.set_x(self.l_margin)
                 self._use_font("B", 13)
                 self.set_text_color(40, 40, 40)
-                self.multi_cell(0, 8, stripped.lstrip("#").strip())
+                self._safe_multi_cell(0, 8, stripped.lstrip("#").strip())
                 self.ln(4)
                 i += 1
                 continue
             if stripped.startswith("#"):
+                self.set_x(self.l_margin)
                 self._use_font("B", 14)
                 self.set_text_color(255, 90, 31)
-                self.multi_cell(0, 9, stripped.lstrip("#").strip())
+                self._safe_multi_cell(0, 9, stripped.lstrip("#").strip())
                 self.ln(4)
                 i += 1
                 continue
 
-            # Horizontal rule
             if stripped in ("---", "***", "___"):
                 self.set_draw_color(180, 180, 180)
                 y = self.get_y() + 2
-                self.line(10, y, self.w - 10, y)
+                self.line(self.l_margin, y, self.w - self.r_margin, y)
                 self.ln(6)
                 i += 1
                 continue
 
-            # Bullet points (-, *, numbered)
             if re.match(r"^[-*]\s", stripped) or re.match(r"^\d+[.)]\s", stripped):
+                self.set_x(self.l_margin)
                 self._use_font("", 10)
                 self.set_text_color(40, 40, 40)
                 if re.match(r"^[-*]\s", stripped):
-                    bullet = "  •  "
+                    bullet = "  -  "
                     body = stripped[2:].strip()
                 else:
                     m = re.match(r"^(\d+[.)])\s*(.*)", stripped)
                     bullet = f"  {m.group(1)} "
                     body = m.group(2)
                 body = _strip_md_inline(body)
-                self.multi_cell(0, 5.5, bullet + body)
+                self._safe_multi_cell(0, 5.5, bullet + body)
                 i += 1
                 continue
 
-            # Table rows (|col|col|) → render as plain text with spacing
             if stripped.startswith("|") and stripped.endswith("|"):
-                # Skip separator rows like |---|---|
                 if re.match(r"^\|[-:\s|]+\|$", stripped):
                     i += 1
                     continue
+                self.set_x(self.l_margin)
                 self._use_font("", 8)
                 self.set_text_color(60, 60, 60)
                 cells = [c.strip() for c in stripped.strip("|").split("|")]
-                row_text = "  |  ".join(_strip_md_inline(c) for c in cells)
-                try:
-                    self.multi_cell(0, 4.5, row_text)
-                except Exception:
-                    self.multi_cell(0, 4.5, "  ".join(_strip_md_inline(c)[:30] for c in cells))
+                col_count = len(cells)
+                if col_count > 0:
+                    avail_w = self.w - self.l_margin - self.r_margin
+                    col_w = avail_w / col_count
+                    for ci, cell_text in enumerate(cells):
+                        cell_text = _strip_md_inline(cell_text)
+                        if ci > 0:
+                            self.set_x(self.l_margin + col_w * ci)
+                        try:
+                            self.multi_cell(col_w, 4.5, cell_text)
+                        except Exception:
+                            try:
+                                self.multi_cell(col_w, 4.5, cell_text[:30])
+                            except Exception:
+                                pass
+                    self.ln(2)
                 i += 1
                 continue
 
-            # Regular paragraph — collect consecutive non-special lines
             para_lines = []
             while i < len(lines):
                 ln = lines[i].strip()
@@ -247,11 +275,12 @@ class _ReportPDF(FPDF):
                 i += 1
 
             if para_lines:
+                self.set_x(self.l_margin)
                 self._use_font("", 10)
                 self.set_text_color(40, 40, 40)
                 para = " ".join(para_lines)
                 para = _strip_md_inline(para)
-                self.multi_cell(0, 5.5, para)
+                self._safe_multi_cell(0, 5.5, para)
                 self.ln(2)
                 continue
 
