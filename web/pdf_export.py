@@ -52,8 +52,8 @@ def _is_cjk_font_name(path: Path) -> bool:
 def _try_load_font(font_path: str) -> bool:
     try:
         pdf = FPDF()
-        pdf.add_font("CJK", "", font_path, uni=True)
-        pdf.add_font("CJK", "B", font_path, uni=True)
+        pdf.add_font("CJK", "", font_path)
+        pdf.add_font("CJK", "B", font_path)
         pdf.set_font("CJK", "", 10)
         return pdf.get_string_width("测试") > 0
     except Exception:
@@ -163,8 +163,8 @@ class _ReportPDF(FPDF):
         if font_path:
             try:
                 bold_path = _CACHED_FONT_BOLD if _CACHED_FONT_BOLD.exists() else font_path
-                self.add_font("CJK", "", font_path, uni=True)
-                self.add_font("CJK", "B", bold_path, uni=True)
+                self.add_font("CJK", "", font_path)
+                self.add_font("CJK", "B", bold_path)
                 self.set_font("CJK", "", 10)
                 if self.get_string_width("测试") > 0:
                     self._has_cjk = True
