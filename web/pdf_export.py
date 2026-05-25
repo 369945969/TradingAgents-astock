@@ -258,6 +258,13 @@ class _ReportPDF(FPDF):
 
 def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, signal: str) -> bytes:
     """Generate a PDF report and return it as bytes."""
+    if not _CJK_FONT_PATH:
+        raise RuntimeError(
+            "未找到中文字体，无法生成 PDF。请安装中文字体：\n"
+            "  CentOS/RHEL: dnf install google-noto-sans-cjk-fonts\n"
+            "  Ubuntu/Debian: apt install fonts-noto-cjk\n"
+            "  macOS: 系统自带 PingFang 字体"
+        )
     pdf = _ReportPDF(ticker, trade_date, signal)
     pdf.alias_nb_pages()
     pdf.set_auto_page_break(auto=True, margin=20)

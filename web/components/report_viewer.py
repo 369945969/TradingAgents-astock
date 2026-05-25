@@ -77,14 +77,19 @@ def render_report(
 
     col_pdf, col_spacer = st.columns([1, 3])
     with col_pdf:
-        pdf_bytes = generate_pdf(final_state, ticker, trade_date, signal)
-        st.download_button(
-            "📥 下载 PDF 报告",
-            data=pdf_bytes,
-            file_name=f"TradingAgents-Astock_{ticker}_{trade_date}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-        )
+        try:
+            pdf_bytes = generate_pdf(final_state, ticker, trade_date, signal)
+            st.download_button(
+                "📥 下载 PDF 报告",
+                data=pdf_bytes,
+                file_name=f"TradingAgents-Astock_{ticker}_{trade_date}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        except RuntimeError as e:
+            st.caption("📄 PDF 不可用（缺少中文字体）")
+            with st.expander("查看字体安装说明"):
+                st.code(str(e))
 
     st.markdown("---")
 
