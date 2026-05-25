@@ -63,8 +63,8 @@ def _try_load_font(font_path: str) -> bool:
 def _find_cjk_font_paths() -> list[str]:
     paths: list[str] = []
 
-    if _CACHED_FONT.exists():
-        paths.append(str(_CACHED_FONT))
+    if _CACHED_FONT_REGULAR.exists():
+        paths.append(str(_CACHED_FONT_REGULAR))
 
     for path in _FONT_CANDIDATES:
         if Path(path).exists() and path not in paths:
@@ -91,13 +91,22 @@ def _find_working_cjk_font() -> str | None:
 
 def _download_cjk_font() -> str | None:
     _FONT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    for url in _FONT_DOWNLOAD_URLS:
+    for url_set in _FONT_DOWNLOAD_URLS:
         try:
-            tmp = _FONT_CACHE_DIR / "NotoSansSC-Regular.otf"
-            urllib.request.urlretrieve(url, str(tmp))
-            if tmp.exists() and tmp.stat().st_size > 1_000_000:
-                return str(tmp)
-            tmp.unlink(missing_ok=True)
+            regular_url = url_set["regular"]
+            bold_url = url_set["bold"]
+
+            urllib.request.urlretrieve(regular_url, str(_CACHED_FONT_REGULAR))
+            if not (_CACHED_FONT_REGULAR.exists() and _CACHED_FONT_REGULAR.stat().st_size > 1_000_000):
+                _CACHED_FONT_REGULAR.unlink(missing_ok=True)
+                continue
+
+            try:
+                urllib.request.urlretrieve(bold_url, str(_CACHED_FONT_BOLD))
+            except Exception:
+                pass
+
+            return str(_CACHED_FONT_REGULAR)
         except Exception:
             continue
     return None
@@ -153,8 +162,9 @@ class _ReportPDF(FPDF):
 
         if font_path:
             try:
+                bold_path = _CACHED_FONT_BOLD if _CACHED_FONT_BOLD.exists() else font_path
                 self.add_font("CJK", "", font_path, uni=True)
-                self.add_font("CJK", "B", font_path, uni=True)
+                self.add_font("CJK", "B", bold_path, uni=True)
                 self.set_font("CJK", "", 10)
                 if self.get_string_width("测试") > 0:
                     self._has_cjk = True
@@ -374,7 +384,7 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
             "  CentOS/RHEL: dnf install google-noto-sans-cjk-fonts\n"
             "  Ubuntu/Debian: apt install fonts-noto-cjk\n"
             "  macOS: 系统自带 PingFang 字体\n"
-            "或手动下载 NotoSansSC-Regular.otf 到 ~/.tradingagents/fonts/"
+            "或手动下载 NotoSansCJKsc-Regular.otf 到 ~/.tradingagents/fonts/"
         )
 
     try:
@@ -388,7 +398,7 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
                 "CJK 字体加载失败，无法渲染中文。请安装中文字体：\n"
                 "  CentOS/RHEL: dnf install google-noto-sans-cjk-fonts\n"
                 "  Ubuntu/Debian: apt install fonts-noto-cjk\n"
-                "或手动下载 NotoSansSC-Regular.otf 到 ~/.tradingagents/fonts/"
+                "或手动下载 NotoSansCJKsc-Regular.otf 到 ~/.tradingagents/fonts/"
             )
         pdf.alias_nb_pages()
         pdf.set_auto_page_break(auto=True, margin=20)
