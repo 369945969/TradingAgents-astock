@@ -31,6 +31,17 @@ _FONT_CANDIDATES = [
 ]
 
 
+def _try_add_font(pdf: FPDF, font_path: str) -> bool:
+    try:
+        pdf.add_font("CJK", "", font_path, uni=True)
+        pdf.add_font("CJK", "B", font_path, uni=True)
+        pdf.set_font("CJK", "", 10)
+        test_w = pdf.get_string_width("测试")
+        return test_w > 0
+    except Exception:
+        return False
+
+
 def _is_valid_cjk_font(path: Path) -> bool:
     suffix = path.suffix.lower()
     if suffix == ".ttc":
@@ -125,15 +136,7 @@ class _ReportPDF(FPDF):
         self._has_cjk = False
 
         if _CJK_FONT_PATH:
-            try:
-                self.add_font("CJK", "", _CJK_FONT_PATH, uni=True)
-                self.add_font("CJK", "B", _CJK_FONT_PATH, uni=True)
-                self.set_font("CJK", "", 10)
-                test_w = self.get_string_width("测试")
-                if test_w > 0:
-                    self._has_cjk = True
-            except Exception:
-                pass
+            self._has_cjk = _try_add_font(self, _CJK_FONT_PATH)
 
     def _use_font(self, style: str = "", size: int = 10) -> None:
         if self._has_cjk:
