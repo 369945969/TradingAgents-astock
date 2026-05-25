@@ -19,6 +19,8 @@ _FONT_CANDIDATES = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/noto-sans-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/google-noto-vf/NotoSansCJK[wght].ttf",
+    "/usr/share/fonts/noto-vf/NotoSansCJK[wght].ttf",
 ]
 
 
@@ -26,7 +28,6 @@ def _find_cjk_font() -> str | None:
     for path in _FONT_CANDIDATES:
         if Path(path).exists():
             return path
-    # Fallback: search common font directories for any CJK font
     for search_dir in ["/usr/share/fonts", "/usr/local/share/fonts", "/System/Library/Fonts"]:
         search_path = Path(search_dir)
         if not search_path.exists():
@@ -34,7 +35,11 @@ def _find_cjk_font() -> str | None:
         for ext in ("*.ttf", "*.ttc", "*.otf"):
             for f in search_path.rglob(ext):
                 name_lower = f.name.lower()
-                if any(kw in name_lower for kw in ("cjk", "noto", "sans-sc", "pingfang", "heiti", "songti", "wqy", "wenquanyi", "droid")):
+                if any(kw in name_lower for kw in (
+                    "cjk", "sans-sc", "pingfang", "heiti",
+                    "songti", "wqy", "wenquanyi", "droid",
+                    "notosanssc", "notoserifsc",
+                )):
                     return str(f)
     return None
 
