@@ -134,8 +134,8 @@ st.markdown(
 def _build_config() -> dict:
     config = DEFAULT_CONFIG.copy()
     config["llm_provider"] = st.session_state.get("llm_provider", "deepseek")
-    config["deep_think_llm"] = st.session_state.get("deep_think_llm", "deepseek-chat")
-    config["quick_think_llm"] = st.session_state.get("quick_think_llm", "deepseek-chat")
+    config["deep_think_llm"] = st.session_state.get("deep_think_llm", "deepseek-v4-pro")
+    config["quick_think_llm"] = st.session_state.get("quick_think_llm", "deepseek-v4-flash")
     config["data_vendors"] = {
         "core_stock_apis": "a_stock",
         "technical_indicators": "a_stock",

@@ -34,7 +34,8 @@ def create_llm_client(
     """
     provider_lower = provider.lower()
 
-    if provider_lower in _OPENAI_COMPATIBLE:
+    # Special handling for qwen-openai to ensure it's always recognized
+    if provider_lower == "qwen-openai" or provider_lower in _OPENAI_COMPATIBLE:
         from .openai_client import OpenAIClient
         return OpenAIClient(model, base_url, provider=provider_lower, **kwargs)
 

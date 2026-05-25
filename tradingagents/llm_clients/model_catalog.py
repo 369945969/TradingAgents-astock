@@ -89,19 +89,6 @@ MODEL_OPTIONS: ProviderModeOptions = {
             ("Custom model ID", "custom"),
         ],
     },
-    "qwen-openai": {
-        "quick": [
-            ("Qwen 3.5 Flash", "qwen-3.5-flash"),
-            ("Qwen Plus", "qwen-plus"),
-            ("Custom model ID", "custom"),
-        ],
-        "deep": [
-            ("Qwen 3.6 Plus", "qwen-3.6-plus"),
-            ("Qwen 3.5 Plus", "qwen-3.5-plus"),
-            ("Qwen 3 Max", "qwen-3-max"),
-            ("Custom model ID", "custom"),
-        ],
-    },
     "glm": {
         "quick": [
             ("GLM-4.7", "glm-4.7"),

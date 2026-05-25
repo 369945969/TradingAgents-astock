@@ -114,7 +114,7 @@ _PROVIDER_CONFIG = {
     "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
     "deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY"),
     "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
-    "qwen-openai": ("http://76.13.11.164:8083/v1/", "DASHSCOPE_API_KEY"),
+    "qwen-openai": ("http://76.13.11.164:8083/v1/", "QWEN_OPENAI_API_KEY"),
     "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
     "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": ("http://localhost:11434/v1", None),
@@ -151,11 +151,16 @@ class OpenAIClient(BaseLLMClient):
         # provider default so users can route through their own gateway.
         if self.provider in _PROVIDER_CONFIG:
             default_base, api_key_env = _PROVIDER_CONFIG[self.provider]
-            llm_kwargs["base_url"] = self.base_url or default_base
+            # Check for provider-specific BASE_URL env var first
+            base_url_env = f"{self.provider.upper()}_BASE_URL"
+            env_base_url = os.environ.get(base_url_env)
+            llm_kwargs["base_url"] = self.base_url or env_base_url or default_base
             if api_key_env:
                 api_key = os.environ.get(api_key_env)
                 if api_key:
                     llm_kwargs["api_key"] = api_key
+                else:
+                    print(f"[OpenAIClient] Warning: API key environment variable '{api_key_env}' not set for provider '{self.provider}'")
             else:
                 llm_kwargs["api_key"] = "ollama"
         elif self.base_url:
@@ -174,6 +179,14 @@ class OpenAIClient(BaseLLMClient):
         # DeepSeek's thinking-mode quirks live in their own subclass so the
         # base NormalizedChatOpenAI stays free of provider-specific branches.
         chat_cls = DeepSeekChatOpenAI if self.provider == "deepseek" else NormalizedChatOpenAI
+        
+        # Log LLM configuration for debugging
+        print(f"[OpenAIClient] Creating LLM client for provider: {self.provider}")
+        print(f"[OpenAIClient] Model: {self.model}")
+        print(f"[OpenAIClient] Base URL: {llm_kwargs.get('base_url')}")
+        print(f"[OpenAIClient] API Key set: {'Yes' if llm_kwargs.get('api_key') else 'No'}")
+        print(f"[OpenAIClient] Using class: {chat_cls.__name__}")
+        
         return chat_cls(**llm_kwargs)
 
     def validate_model(self) -> bool:

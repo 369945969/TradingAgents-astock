@@ -72,6 +72,26 @@ kill_process() {
     else
         log "没有运行中的进程"
     fi
+
+    # 确保端口 8501 没有被占用
+    local port_pid=$(lsof -ti:8501 2>/dev/null)
+    if [[ -n "${port_pid}" ]]; then
+        log "${YELLOW}端口 8501 被占用，PID: ${port_pid}，正在停止...${NC}"
+        kill -9 ${port_pid} 2>/dev/null
+        sleep 1
+        log "${GREEN}端口 8501 已释放${NC}"
+    fi
+}
+
+# 清理 Python 缓存
+clean_pycache() {
+    log "清理 Python 缓存..."
+    find "${PROJECT_DIR}" -type d -name "__pycache__" -exec rm -rf {} + >/dev/null 2>&1
+    find "${PROJECT_DIR}" -type f -name "*.pyc" -delete >/dev/null 2>&1
+    find "${PROJECT_DIR}" -type f -name "*.pyo" -delete >/dev/null 2>&1
+    find "${PROJECT_DIR}" -type d -name ".cache" -exec rm -rf {} + >/dev/null 2>&1
+    rm -rf ~/.streamlit/cache/ >/dev/null 2>&1
+    log "${GREEN}缓存清理完成${NC}"
 }
 
 # 设置沙箱环境
@@ -128,6 +148,9 @@ main() {
     
     log "${GREEN}========== TradingAgents 启动脚本 ==========${NC}"
     
+    # 0. 清理 Python 缓存（确保加载最新代码）
+    clean_pycache
+    
     # 1. 设置沙箱环境
     setup_sandbox
     
@@ -146,7 +169,7 @@ main() {
             exit $?
             ;;
         web)
-            cmd="${PYTHON_BIN} -m streamlit run ${PROJECT_DIR}/web/app.py --server.headless true"
+            cmd="${PYTHON_BIN} -m streamlit run ${PROJECT_DIR}/web/app.py --server.headless true --server.port 8501"
             ;;
         main)
             cmd="${PYTHON_BIN} ${PROJECT_DIR}/main.py"

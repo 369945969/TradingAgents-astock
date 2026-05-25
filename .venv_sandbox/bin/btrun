@@ -1,4 +1,4 @@
-#!/Users/jack/python/TradingAgents-astock/.venv_sandbox/bin/python3.12
+#!/Users/jack/python/TradingAgents-astock/.venv_sandbox/bin/python
 import sys
 from backtrader.btrun import btrun
 if __name__ == '__main__':
