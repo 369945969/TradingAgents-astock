@@ -96,12 +96,23 @@ class _ReportPDF(FPDF):
     def _safe_multi_cell(self, w, h, txt, **kwargs) -> None:
         try:
             self.multi_cell(w, h, txt, **kwargs)
+            return
         except Exception:
-            safe = txt[:200] if len(txt) > 200 else txt
-            try:
-                self.multi_cell(w, h, safe, **kwargs)
-            except Exception:
-                pass
+            pass
+        try:
+            self.multi_cell(w, h, txt[:200] if len(txt) > 200 else txt, **kwargs)
+            return
+        except Exception:
+            pass
+        try:
+            saved_font = self.font_family
+            saved_style = self.font_style
+            saved_size = self.font_size_pt
+            self.set_font("Helvetica", "", 8)
+            self.multi_cell(w, h, txt[:100] if len(txt) > 100 else txt, **kwargs)
+            self.set_font(saved_font, saved_style, saved_size)
+        except Exception:
+            pass
 
     def _safe_cell(self, w, h, txt, **kwargs) -> None:
         try:
@@ -345,11 +356,13 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
         if final_decision:
             pdf.add_section("最终决策", _strip_think(str(final_decision)))
 
-        result = pdf.output()
+        result = pdf.output(dest="S")
         if isinstance(result, bytes):
             return result
         if isinstance(result, bytearray):
             return bytes(result)
-        return result.encode("latin-1")
+        if isinstance(result, str):
+            return result.encode("latin-1")
+        return bytes(result)
     except Exception as e:
         raise RuntimeError(f"PDF 生成失败: {e}") from e
