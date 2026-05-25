@@ -227,11 +227,14 @@ class _ReportPDF(FPDF):
                 if re.match(r"^\|[-:\s|]+\|$", stripped):
                     i += 1
                     continue
-                self._use_font("", 9)
+                self._use_font("", 8)
                 self.set_text_color(60, 60, 60)
                 cells = [c.strip() for c in stripped.strip("|").split("|")]
-                row_text = "    ".join(_strip_md_inline(c) for c in cells)
-                self.multi_cell(0, 5, row_text)
+                row_text = "  |  ".join(_strip_md_inline(c) for c in cells)
+                try:
+                    self.multi_cell(0, 4.5, row_text)
+                except Exception:
+                    self.multi_cell(0, 4.5, "  ".join(_strip_md_inline(c)[:30] for c in cells))
                 i += 1
                 continue
 
