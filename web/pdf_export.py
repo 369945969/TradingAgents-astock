@@ -61,8 +61,7 @@ def _find_cjk_font() -> str | None:
         return str(_CACHED_FONT)
 
     for path in _FONT_CANDIDATES:
-        p = Path(path)
-        if p.exists() and p.suffix.lower() != ".ttc":
+        if Path(path).exists():
             return path
 
     for search_dir in ["/usr/share/fonts", "/usr/local/share/fonts", "/System/Library/Fonts"]:
