@@ -18,8 +18,12 @@ def _signal_style(signal: str) -> tuple[str, str]:
     s = signal.upper()
     if "BUY" in s:
         return "#22c55e", "买入"
+    if "OVERWEIGHT" in s:
+        return "#4ade80", "增持"
     if "SELL" in s:
         return "#ef4444", "卖出"
+    if "UNDERWEIGHT" in s:
+        return "#f87171", "减持"
     return "#fbbf24", "持有"
 
 

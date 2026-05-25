@@ -59,8 +59,12 @@ def _signal_color(signal: str) -> tuple[int, int, int]:
     s = signal.upper()
     if "BUY" in s:
         return (34, 197, 94)
+    if "OVERWEIGHT" in s:
+        return (74, 222, 128)
     if "SELL" in s:
         return (239, 68, 68)
+    if "UNDERWEIGHT" in s:
+        return (248, 113, 113)
     return (251, 191, 36)
 
 

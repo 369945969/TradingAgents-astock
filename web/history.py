@@ -41,19 +41,17 @@ def load_analysis(path: str) -> dict[str, Any]:
 
 
 def extract_signal(state: dict[str, Any]) -> str:
-    """Extract the short signal (Buy/Sell/Hold) from a final state dict."""
-    import re
+    from tradingagents.agents.utils.rating import parse_rating
 
     for field in (
-        "investment_plan",
-        "trader_investment_decision",
         "final_trade_decision",
+        "trader_investment_decision",
+        "investment_plan",
     ):
         text = state.get(field, "")
         if not text:
             continue
-        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-        for keyword in ("BUY", "SELL", "HOLD"):
-            if keyword in cleaned.upper():
-                return keyword.capitalize()
+        rating = parse_rating(text)
+        if rating != "N/A":
+            return rating
     return "N/A"
