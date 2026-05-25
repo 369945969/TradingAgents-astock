@@ -13,11 +13,14 @@ from fpdf import FPDF
 
 
 _FONT_CACHE_DIR = Path.home() / ".tradingagents" / "fonts"
-_CACHED_FONT = _FONT_CACHE_DIR / "NotoSansSC-Regular.otf"
+_CACHED_FONT_REGULAR = _FONT_CACHE_DIR / "NotoSansCJKsc-Regular.otf"
+_CACHED_FONT_BOLD = _FONT_CACHE_DIR / "NotoSansCJKsc-Bold.otf"
 
 _FONT_DOWNLOAD_URLS = [
-    "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf",
-    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf",
+    {
+        "regular": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+        "bold": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf",
+    },
 ]
 
 _FONT_CANDIDATES = [
