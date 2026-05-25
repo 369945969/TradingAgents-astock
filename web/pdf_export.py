@@ -167,32 +167,31 @@ class _ReportPDF(FPDF):
             line = lines[i]
             stripped = line.strip()
 
-            # Empty line → small vertical gap
             if not stripped:
                 self.ln(3)
                 i += 1
                 continue
 
-            # Headings: ### → 11pt, ## → 13pt, # → 14pt
+            # Headings
             if stripped.startswith("###"):
                 self._use_font("B", 11)
                 self.set_text_color(50, 50, 50)
-                self.cell(0, 7, stripped.lstrip("#").strip())
-                self.ln(8)
+                self.multi_cell(0, 7, stripped.lstrip("#").strip())
+                self.ln(4)
                 i += 1
                 continue
             if stripped.startswith("##"):
                 self._use_font("B", 13)
                 self.set_text_color(40, 40, 40)
-                self.cell(0, 8, stripped.lstrip("#").strip())
-                self.ln(9)
+                self.multi_cell(0, 8, stripped.lstrip("#").strip())
+                self.ln(4)
                 i += 1
                 continue
             if stripped.startswith("#"):
                 self._use_font("B", 14)
                 self.set_text_color(255, 90, 31)
-                self.cell(0, 9, stripped.lstrip("#").strip())
-                self.ln(10)
+                self.multi_cell(0, 9, stripped.lstrip("#").strip())
+                self.ln(4)
                 i += 1
                 continue
 
@@ -268,52 +267,55 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
             "  Ubuntu/Debian: apt install fonts-noto-cjk\n"
             "  macOS: 系统自带 PingFang 字体"
         )
-    pdf = _ReportPDF(ticker, trade_date, signal)
-    pdf.alias_nb_pages()
-    pdf.set_auto_page_break(auto=True, margin=20)
+    try:
+        pdf = _ReportPDF(ticker, trade_date, signal)
+        pdf.alias_nb_pages()
+        pdf.set_auto_page_break(auto=True, margin=20)
 
-    pdf.add_cover()
+        pdf.add_cover()
 
-    for key, title in _REPORT_SECTIONS:
-        content = final_state.get(key, "")
-        if content:
-            pdf.add_section(title, str(content))
+        for key, title in _REPORT_SECTIONS:
+            content = final_state.get(key, "")
+            if content:
+                pdf.add_section(title, str(content))
 
-    debate = final_state.get("investment_debate_state")
-    if debate and isinstance(debate, dict):
-        parts = []
-        if debate.get("bull_history"):
-            parts.append(f"=== 多方论点 ===\n{debate['bull_history']}")
-        if debate.get("bear_history"):
-            parts.append(f"\n=== 空方论点 ===\n{debate['bear_history']}")
-        if debate.get("judge_decision"):
-            parts.append(f"\n=== 研究经理决策 ===\n{debate['judge_decision']}")
-        if parts:
-            pdf.add_section("多空辩论", "\n".join(parts))
+        debate = final_state.get("investment_debate_state")
+        if debate and isinstance(debate, dict):
+            parts = []
+            if debate.get("bull_history"):
+                parts.append(f"=== 多方论点 ===\n{debate['bull_history']}")
+            if debate.get("bear_history"):
+                parts.append(f"\n=== 空方论点 ===\n{debate['bear_history']}")
+            if debate.get("judge_decision"):
+                parts.append(f"\n=== 研究经理决策 ===\n{debate['judge_decision']}")
+            if parts:
+                pdf.add_section("多空辩论", "\n".join(parts))
 
-    trader_decision = final_state.get("trader_investment_decision", "")
-    if trader_decision:
-        pdf.add_section("交易员决策", _strip_think(str(trader_decision)))
+        trader_decision = final_state.get("trader_investment_decision", "")
+        if trader_decision:
+            pdf.add_section("交易员决策", _strip_think(str(trader_decision)))
 
-    inv_plan = final_state.get("investment_plan", "")
-    if inv_plan:
-        pdf.add_section("最终投资建议", _strip_think(str(inv_plan)))
+        inv_plan = final_state.get("investment_plan", "")
+        if inv_plan:
+            pdf.add_section("最终投资建议", _strip_think(str(inv_plan)))
 
-    risk = final_state.get("risk_debate_state")
-    if risk and isinstance(risk, dict):
-        parts = []
-        for key_name, label in [("aggressive_history", "激进观点"),
-                                 ("conservative_history", "保守观点"),
-                                 ("neutral_history", "中性观点")]:
-            if risk.get(key_name):
-                parts.append(f"=== {label} ===\n{risk[key_name]}")
-        if risk.get("judge_decision"):
-            parts.append(f"\n=== 风控决策 ===\n{risk['judge_decision']}")
-        if parts:
-            pdf.add_section("风控评估", "\n".join(parts))
+        risk = final_state.get("risk_debate_state")
+        if risk and isinstance(risk, dict):
+            parts = []
+            for key_name, label in [("aggressive_history", "激进观点"),
+                                     ("conservative_history", "保守观点"),
+                                     ("neutral_history", "中性观点")]:
+                if risk.get(key_name):
+                    parts.append(f"=== {label} ===\n{risk[key_name]}")
+            if risk.get("judge_decision"):
+                parts.append(f"\n=== 风控决策 ===\n{risk['judge_decision']}")
+            if parts:
+                pdf.add_section("风控评估", "\n".join(parts))
 
-    final_decision = final_state.get("final_trade_decision", "")
-    if final_decision:
-        pdf.add_section("最终决策", _strip_think(str(final_decision)))
+        final_decision = final_state.get("final_trade_decision", "")
+        if final_decision:
+            pdf.add_section("最终决策", _strip_think(str(final_decision)))
 
-    return bytes(pdf.output())
+        return bytes(pdf.output())
+    except Exception as e:
+        raise RuntimeError(f"PDF 生成失败: {e}") from e
