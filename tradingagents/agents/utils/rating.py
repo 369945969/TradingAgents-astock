@@ -26,25 +26,36 @@ _RATING_SET = {r.lower() for r in RATINGS_5_TIER}
 # bold wrappers and either a colon or hyphen separator.
 _RATING_LABEL_RE = re.compile(r"rating.*?[:\-][\s*]*(\w+)", re.IGNORECASE)
 
+_RATING_KEYWORDS_ZH = {
+    "买入": "Buy",
+    "加仓": "Overweight",
+    "增持": "Overweight",
+    "持有": "Hold",
+    "观望": "Hold",
+    "减持": "Underweight",
+    "减仓": "Underweight",
+    "卖出": "Sell",
+    "清仓": "Sell",
+}
+
 
 def parse_rating(text: str, default: str = "Hold") -> str:
-    """Heuristically extract a 5-tier rating from prose text.
-
-    Two-pass strategy:
-    1. Look for an explicit "Rating: X" label (tolerant of markdown bold).
-    2. Fall back to the first 5-tier rating word found anywhere in the text.
-
-    Returns a Title-cased rating string, or ``default`` if no rating word appears.
-    """
     for line in text.splitlines():
         m = _RATING_LABEL_RE.search(line)
         if m and m.group(1).lower() in _RATING_SET:
             return m.group(1).capitalize()
 
-    for line in text.splitlines():
-        for word in line.lower().split():
+    lines = text.splitlines()
+    for line in lines:
+        line_lower = line.lower()
+        for word in line_lower.split():
             clean = word.strip("*:.,")
             if clean in _RATING_SET:
                 return clean.capitalize()
+
+    full_lower = text.lower()
+    for zh_keyword, en_rating in _RATING_KEYWORDS_ZH.items():
+        if zh_keyword in full_lower:
+            return en_rating
 
     return default
