@@ -16,6 +16,8 @@ _FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf",
     "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/noto-sans-cjk/NotoSansCJK-Regular.ttc",
 ]
 
 
@@ -23,7 +25,20 @@ def _find_cjk_font() -> str | None:
     for path in _FONT_CANDIDATES:
         if Path(path).exists():
             return path
+    # Fallback: search common font directories for any CJK font
+    for search_dir in ["/usr/share/fonts", "/usr/local/share/fonts", "/System/Library/Fonts"]:
+        search_path = Path(search_dir)
+        if not search_path.exists():
+            continue
+        for ext in ("*.ttf", "*.ttc", "*.otf"):
+            for f in search_path.rglob(ext):
+                name_lower = f.name.lower()
+                if any(kw in name_lower for kw in ("cjk", "noto", "sans-sc", "pingfang", "heiti", "songti", "wqy", "wenquanyi", "droid")):
+                    return str(f)
     return None
+
+
+_CJK_FONT_PATH = _find_cjk_font()
 
 
 def _strip_think(text: str) -> str:
@@ -67,10 +82,9 @@ class _ReportPDF(FPDF):
         self.signal = signal
         self._has_cjk = False
 
-        font_path = _find_cjk_font()
-        if font_path:
-            self.add_font("CJK", "", font_path, uni=True)
-            self.add_font("CJK", "B", font_path, uni=True)
+        if _CJK_FONT_PATH:
+            self.add_font("CJK", "", _CJK_FONT_PATH, uni=True)
+            self.add_font("CJK", "B", _CJK_FONT_PATH, uni=True)
             self._has_cjk = True
 
     def _use_font(self, style: str = "", size: int = 10) -> None:
