@@ -1,36 +1,37 @@
+#!/usr/bin/env python3
+"""Diagnose CJK font availability on the server."""
+
 import sys
 from pathlib import Path
 
-search_dirs = ["/usr/share/fonts", "/usr/local/share/fonts"]
-cjk_keywords = ("cjk", "sans-sc", "pingfang", "heiti", "songti", "wqy", "wenquanyi", "droid", "notosanssc", "notoserifsc")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-print("Searching for CJK fonts...")
-print("=" * 80)
+from web.pdf_export import _find_cjk_font_paths, _try_load_font, _download_cjk_font
 
-found = []
-for search_dir in search_dirs:
-    search_path = Path(search_dir)
-    if not search_path.exists():
-        print(f"  [SKIP] {search_dir} does not exist")
-        continue
-    for ext in ("*.ttf", "*.ttc", "*.otf"):
-        for f in search_path.rglob(ext):
-            name_lower = f.name.lower()
-            is_cjk = any(kw in name_lower for kw in cjk_keywords)
-            if is_cjk:
-                found.append(str(f))
-                print(f"  [CJK]  {f}")
-            elif "noto" in name_lower:
-                print(f"  [NOTO] {f}  (not CJK)")
+print("=" * 70)
+print("CJK Font Diagnosis")
+print("=" * 70)
 
-if not found:
-    print("\nNo CJK fonts found! Checking all available fonts:")
-    for search_dir in search_dirs:
-        search_path = Path(search_dir)
-        if not search_path.exists():
-            continue
-        for ext in ("*.ttf", "*.ttc", "*.otf"):
-            for f in sorted(search_path.rglob(ext)):
-                print(f"  {f}")
+paths = _find_cjk_font_paths()
+print(f"\nFound {len(paths)} candidate font(s):")
+for p in paths:
+    print(f"  {p}")
+
+print("\nTesting each font with fpdf2:")
+for p in paths:
+    ok = _try_load_font(p)
+    status = "OK" if ok else "FAIL"
+    print(f"  [{status}] {p}")
+
+print("\nTrying auto-download:")
+result = _download_cjk_font()
+if result:
+    print(f"  Downloaded to: {result}")
+    ok = _try_load_font(result)
+    print(f"  Load test: {'OK' if ok else 'FAIL'}")
 else:
-    print(f"\nFound {len(found)} CJK font(s)")
+    print("  Download failed - server may not have internet access")
+    print("  Manual fix: download NotoSansSC-Regular.otf and save to:")
+    print(f"  {Path.home() / '.tradingagents' / 'fonts' / 'NotoSansSC-Regular.otf'}")
+
+print("\n" + "=" * 70)

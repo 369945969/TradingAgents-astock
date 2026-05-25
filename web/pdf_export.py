@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 import tempfile
 import urllib.request
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -14,79 +13,94 @@ from fpdf import FPDF
 
 
 _FONT_CACHE_DIR = Path.home() / ".tradingagents" / "fonts"
-_CACHED_FONT = _FONT_CACHE_DIR / "NotoSansSC-Regular.ttf"
+_CACHED_FONT = _FONT_CACHE_DIR / "NotoSansSC-Regular.otf"
 
-_FONT_DOWNLOAD_URL = (
-    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/"
-    "NotoSansSC-Regular.otf"
-)
+_FONT_DOWNLOAD_URLS = [
+    "https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf",
+    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf",
+]
 
 _FONT_CANDIDATES = [
     "/System/Library/Fonts/PingFang.ttc",
     "/System/Library/Fonts/STHeiti Light.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf",
     "/usr/share/fonts/noto-cjk/NotoSansCJKsc-Regular.otf",
+    "/usr/share/fonts/google-noto-sans-cjk-fonts/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/google-noto-vf/NotoSansCJK[wght].ttf",
     "/usr/share/fonts/noto-vf/NotoSansCJK[wght].ttf",
 ]
 
+_CJK_NAME_KEYWORDS = (
+    "cjk", "sans-sc", "pingfang", "heiti",
+    "songti", "wqy", "wenquanyi", "droid",
+    "notosanssc", "notoserifsc",
+)
 
-def _try_add_font(pdf: FPDF, font_path: str) -> bool:
+_CJK_NAME_EXCLUDES = ("mono",)
+
+
+def _is_cjk_font_name(path: Path) -> bool:
+    name_lower = path.name.lower()
+    if any(kw in name_lower for kw in _CJK_NAME_EXCLUDES):
+        return False
+    return any(kw in name_lower for kw in _CJK_NAME_KEYWORDS)
+
+
+def _try_load_font(font_path: str) -> bool:
     try:
+        pdf = FPDF()
         pdf.add_font("CJK", "", font_path, uni=True)
         pdf.add_font("CJK", "B", font_path, uni=True)
         pdf.set_font("CJK", "", 10)
-        test_w = pdf.get_string_width("测试")
-        return test_w > 0
+        return pdf.get_string_width("测试") > 0
     except Exception:
         return False
 
 
-def _is_valid_cjk_font(path: Path) -> bool:
-    suffix = path.suffix.lower()
-    if suffix == ".ttc":
-        return False
-    name_lower = path.name.lower()
-    if any(kw in name_lower for kw in ("mono", "mono-cjk")):
-        return False
-    return any(kw in name_lower for kw in (
-        "cjk", "sans-sc", "pingfang", "heiti",
-        "songti", "wqy", "wenquanyi", "droid",
-        "notosanssc", "notoserifsc",
-    ))
+def _find_cjk_font_paths() -> list[str]:
+    paths: list[str] = []
 
-
-def _find_cjk_font() -> str | None:
     if _CACHED_FONT.exists():
-        return str(_CACHED_FONT)
+        paths.append(str(_CACHED_FONT))
 
     for path in _FONT_CANDIDATES:
-        if Path(path).exists():
-            return path
+        if Path(path).exists() and path not in paths:
+            paths.append(path)
 
     for search_dir in ["/usr/share/fonts", "/usr/local/share/fonts", "/System/Library/Fonts"]:
         search_path = Path(search_dir)
         if not search_path.exists():
             continue
-        for ext in ("*.ttf", "*.otf"):
-            for f in search_path.rglob(ext):
-                if _is_valid_cjk_font(f):
-                    return str(f)
+        for ext in ("*.otf", "*.ttf", "*.ttc"):
+            for f in sorted(search_path.rglob(ext)):
+                if _is_cjk_font_name(f) and str(f) not in paths:
+                    paths.append(str(f))
 
+    return paths
+
+
+def _find_working_cjk_font() -> str | None:
+    for font_path in _find_cjk_font_paths():
+        if _try_load_font(font_path):
+            return font_path
     return None
 
 
 def _download_cjk_font() -> str | None:
-    try:
-        _FONT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        tmp = _FONT_CACHE_DIR / "NotoSansSC-Regular.otf"
-        urllib.request.urlretrieve(_FONT_DOWNLOAD_URL, str(tmp))
-        return str(tmp)
-    except Exception:
-        return None
+    _FONT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    for url in _FONT_DOWNLOAD_URLS:
+        try:
+            tmp = _FONT_CACHE_DIR / "NotoSansSC-Regular.otf"
+            urllib.request.urlretrieve(url, str(tmp))
+            if tmp.exists() and tmp.stat().st_size > 1_000_000:
+                return str(tmp)
+            tmp.unlink(missing_ok=True)
+        except Exception:
+            continue
+    return None
 
 
-_CJK_FONT_PATH = _find_cjk_font()
+_CJK_FONT_PATH: str | None = None
 
 
 def _strip_think(text: str) -> str:
@@ -127,15 +141,22 @@ _REPORT_SECTIONS = [
 
 
 class _ReportPDF(FPDF):
-    def __init__(self, ticker: str, trade_date: str, signal: str) -> None:
+    def __init__(self, ticker: str, trade_date: str, signal: str, font_path: str | None = None) -> None:
         super().__init__()
         self.ticker = ticker
         self.trade_date = trade_date
         self.signal = signal
         self._has_cjk = False
 
-        if _CJK_FONT_PATH:
-            self._has_cjk = _try_add_font(self, _CJK_FONT_PATH)
+        if font_path:
+            try:
+                self.add_font("CJK", "", font_path, uni=True)
+                self.add_font("CJK", "B", font_path, uni=True)
+                self.set_font("CJK", "", 10)
+                if self.get_string_width("测试") > 0:
+                    self._has_cjk = True
+            except Exception:
+                pass
 
     def _use_font(self, style: str = "", size: int = 10) -> None:
         if self._has_cjk:
@@ -337,10 +358,13 @@ class _ReportPDF(FPDF):
 def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, signal: str) -> bytes:
     """Generate a PDF report and return it as bytes."""
     global _CJK_FONT_PATH
+
     if not _CJK_FONT_PATH:
-        downloaded = _download_cjk_font()
-        if downloaded:
-            _CJK_FONT_PATH = downloaded
+        _CJK_FONT_PATH = _find_working_cjk_font()
+
+    if not _CJK_FONT_PATH:
+        _CJK_FONT_PATH = _download_cjk_font()
+
     if not _CJK_FONT_PATH:
         raise RuntimeError(
             "未找到中文字体，无法生成 PDF。请安装中文字体：\n"
@@ -349,8 +373,20 @@ def generate_pdf(final_state: dict[str, Any], ticker: str, trade_date: str, sign
             "  macOS: 系统自带 PingFang 字体\n"
             "或手动下载 NotoSansSC-Regular.otf 到 ~/.tradingagents/fonts/"
         )
+
     try:
-        pdf = _ReportPDF(ticker, trade_date, signal)
+        pdf = _ReportPDF(ticker, trade_date, signal, font_path=_CJK_FONT_PATH)
+        if not pdf._has_cjk:
+            _CJK_FONT_PATH = _download_cjk_font()
+            if _CJK_FONT_PATH:
+                pdf = _ReportPDF(ticker, trade_date, signal, font_path=_CJK_FONT_PATH)
+        if not pdf._has_cjk:
+            raise RuntimeError(
+                "CJK 字体加载失败，无法渲染中文。请安装中文字体：\n"
+                "  CentOS/RHEL: dnf install google-noto-sans-cjk-fonts\n"
+                "  Ubuntu/Debian: apt install fonts-noto-cjk\n"
+                "或手动下载 NotoSansSC-Regular.otf 到 ~/.tradingagents/fonts/"
+            )
         pdf.alias_nb_pages()
         pdf.set_auto_page_break(auto=True, margin=20)
 

@@ -6,10 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from web.pdf_export import generate_pdf, _CJK_FONT_PATH, _ReportPDF
+from web.pdf_export import generate_pdf, _CJK_FONT_PATH, _find_cjk_font_paths
 
-print(f"CJK Font: {_CJK_FONT_PATH}")
-print(f"Font exists: {Path(_CJK_FONT_PATH).exists() if _CJK_FONT_PATH else False}")
+print(f"CJK Font (cached): {_CJK_FONT_PATH}")
+print(f"CJK Font candidates found: {_find_cjk_font_paths()}")
 print()
 
 all_passed = True
