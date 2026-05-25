@@ -100,13 +100,30 @@ setup_sandbox() {
     
     if [[ ! -d "${VENV_DIR}" ]]; then
         log "${YELLOW}创建虚拟环境...${NC}"
-        python3 -m venv "${VENV_DIR}"
+        if ! python3 -m venv "${VENV_DIR}" 2>/dev/null; then
+            log "${YELLOW}python3 -m venv 失败，尝试使用 python...${NC}"
+            if ! python -m venv "${VENV_DIR}" 2>/dev/null; then
+                log "${YELLOW}虚拟环境创建失败，使用系统 Python${NC}"
+                PYTHON_BIN="$(which python3 2>/dev/null || which python 2>/dev/null)"
+                if [[ -z "${PYTHON_BIN}" ]]; then
+                    log "${RED}未找到 Python，请先安装 Python 3${NC}"
+                    exit 1
+                fi
+                log "${GREEN}使用系统 Python: ${PYTHON_BIN}${NC}"
+            fi
+        fi
+    fi
+    
+    if [[ -z "${PYTHON_BIN}" || ! -f "${PYTHON_BIN}" ]]; then
+        PYTHON_BIN="${VENV_DIR}/bin/python"
     fi
     
     if [[ ! -f "${PYTHON_BIN}" ]]; then
-        log "${RED}虚拟环境 Python 不存在${NC}"
+        log "${RED}Python 不存在: ${PYTHON_BIN}${NC}"
         exit 1
     fi
+    
+    log "使用 Python: ${PYTHON_BIN}"
     
     log "升级 pip..."
     "${PYTHON_BIN}" -m pip install --upgrade pip >/dev/null 2>&1
