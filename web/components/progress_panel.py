@@ -9,10 +9,10 @@ from web.progress import PIPELINE_STAGES, ProgressTracker
 
 def _status_badge(status: str) -> str:
     if status == "done":
-        return '<span style="color:#22c55e; font-size:1.3rem;">●</span>'
+        return '<span style="color:#22c55e; font-size:1.1rem;">✓</span>'
     if status == "active":
-        return '<span style="color:#ff5a1f; font-size:1.3rem;">◉</span>'
-    return '<span style="color:#333; font-size:1.3rem;">○</span>'
+        return '<span style="color:#ff5a1f; font-size:1.1rem;">◉</span>'
+    return '<span style="color:#333; font-size:1.1rem;">○</span>'
 
 
 def _format_time(seconds: float) -> str:
@@ -21,32 +21,41 @@ def _format_time(seconds: float) -> str:
 
 
 def render_progress(tracker: ProgressTracker) -> None:
-    """Render the pipeline progress panel."""
+    completed = len(tracker.completed_stages)
+    total = len(PIPELINE_STAGES)
+    pct = completed / total if total else 0
 
     st.markdown(
         f"""
-        <div style="text-align:center; margin:1rem 0 0.5rem;">
-            <span style="font-size:1.6rem; font-weight:700; color:#f5f1eb;">
-                分析进行中
-            </span>
-            <span style="font-size:1.1rem; color:#888; margin-left:0.8rem;">
-                {tracker.ticker}
-            </span>
+        <div style="
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid #2a2a4a;
+            border-radius: 14px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-size:0.75rem; color:#666; text-transform:uppercase; letter-spacing:1px;">分析进行中</div>
+                    <div style="font-size:1.6rem; font-weight:700; color:#f5f1eb; margin-top:4px;">{tracker.ticker}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:2rem; font-weight:800; color:#ff5a1f;">{completed}/{total}</div>
+                    <div style="font-size:0.8rem; color:#888;">{_format_time(tracker.elapsed)}</div>
+                </div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    completed = len(tracker.completed_stages)
-    total = len(PIPELINE_STAGES)
-    pct = completed / total if total else 0
-    st.progress(pct, text=f"{completed}/{total} 阶段完成  ·  {_format_time(tracker.elapsed)}")
+    st.progress(pct)
 
     analyst_stages = PIPELINE_STAGES[:7]
     post_stages = PIPELINE_STAGES[7:]
 
     st.markdown(
-        '<div style="margin:0.5rem 0 0.3rem; font-size:0.85rem; color:#888;">ANALYSTS</div>',
+        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">Analysts</div>',
         unsafe_allow_html=True,
     )
 
@@ -54,19 +63,37 @@ def render_progress(tracker: ProgressTracker) -> None:
     for col, stage in zip(cols, analyst_stages):
         status = tracker.stage_status(stage["id"])
         badge = _status_badge(status)
-        label_color = "#f5f1eb" if status == "active" else "#888" if status == "pending" else "#22c55e"
+        if status == "done":
+            bg = "#0f1a0f"
+            border = "#1a3a1a"
+            label_color = "#22c55e"
+        elif status == "active":
+            bg = "#1a1008"
+            border = "#3a2a1a"
+            label_color = "#ff5a1f"
+        else:
+            bg = "#111"
+            border = "#1a1a1a"
+            label_color = "#444"
         col.markdown(
             f"""
-            <div style="text-align:center; padding:0.5rem 0;">
-                {badge}<br>
-                <span style="font-size:0.75rem; color:{label_color};">{stage['name']}</span>
+            <div style="
+                background:{bg};
+                border:1px solid {border};
+                border-radius:8px;
+                padding:10px 6px;
+                text-align:center;
+            ">
+                <div style="font-size:1.2rem;">{stage['icon']}</div>
+                <div>{badge}</div>
+                <div style="font-size:0.7rem; color:{label_color}; margin-top:2px;">{stage['name']}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     st.markdown(
-        '<div style="margin:0.8rem 0 0.3rem; font-size:0.85rem; color:#888;">PIPELINE</div>',
+        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">Pipeline</div>',
         unsafe_allow_html=True,
     )
 
@@ -74,12 +101,30 @@ def render_progress(tracker: ProgressTracker) -> None:
     for col, stage in zip(cols2, post_stages):
         status = tracker.stage_status(stage["id"])
         badge = _status_badge(status)
-        label_color = "#f5f1eb" if status == "active" else "#888" if status == "pending" else "#22c55e"
+        if status == "done":
+            bg = "#0f1a0f"
+            border = "#1a3a1a"
+            label_color = "#22c55e"
+        elif status == "active":
+            bg = "#1a1008"
+            border = "#3a2a1a"
+            label_color = "#ff5a1f"
+        else:
+            bg = "#111"
+            border = "#1a1a1a"
+            label_color = "#444"
         col.markdown(
             f"""
-            <div style="text-align:center; padding:0.5rem 0;">
-                {badge}<br>
-                <span style="font-size:0.75rem; color:{label_color};">{stage['name']}</span>
+            <div style="
+                background:{bg};
+                border:1px solid {border};
+                border-radius:8px;
+                padding:10px 6px;
+                text-align:center;
+            ">
+                <div style="font-size:1.2rem;">{stage['icon']}</div>
+                <div>{badge}</div>
+                <div style="font-size:0.7rem; color:{label_color}; margin-top:2px;">{stage['name']}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -104,8 +149,8 @@ def render_progress(tracker: ProgressTracker) -> None:
 
     if completed_reports:
         st.markdown(
-            '<div style="margin:0.5rem 0 0.3rem; font-size:0.85rem; color:#888;">'
-            f"REPORTS ({len(completed_reports)})</div>",
+            '<div style="margin:0.5rem 0 0.3rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">'
+            f"Reports ({len(completed_reports)})</div>",
             unsafe_allow_html=True,
         )
         for name, icon, report in reversed(completed_reports):

@@ -1,0 +1,15 @@
+# ============================================================
+# LLM Configuration
+# ============================================================
+# Active provider: deepseek / openai / anthropic / google / xai / qwen / glm / minimax / ollama / openrouter / local
+LLM_PROVIDER=local
+
+# Quick thinking model (for analysts, researchers, trader)
+QUICK_THINK_LLM=google/gemma-2-27b
+
+# Deep thinking model (for research manager, portfolio manager)
+DEEP_THINK_LLM=google/gemma-2-27b
+
+# Unified API Key & Base URL
+API_KEY="sk-f9306a126fe14e2f92aef49dfbf66209"
+BASE_URL="http://127.0.0.1:1234/v1"

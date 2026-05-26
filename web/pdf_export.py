@@ -208,7 +208,7 @@ class _ReportPDF(FPDF):
         self.set_x(self.l_margin)
         self._use_font("", 8)
         self.set_text_color(150, 150, 150)
-        self._safe_multi_cell(0, 6, f"A股多Agent投研分析  |  {self.ticker}  |  {self.trade_date}", align="C")
+        self._safe_multi_cell(0, 6, f"A股AI投研分析  |  {self.ticker}  |  {self.trade_date}", align="C")
         self.set_draw_color(60, 60, 60)
         self.line(self.l_margin, self.get_y(), self.w - self.r_margin, self.get_y())
         self.ln(4)
@@ -220,9 +220,7 @@ class _ReportPDF(FPDF):
         self.set_text_color(120, 120, 120)
         self._safe_cell(0, 5, f"Page {self.page_no()}/{{nb}}", align="C")
         self.ln(4)
-        self._use_font("", 6)
-        self.set_text_color(160, 160, 160)
-        self._safe_cell(0, 4, "仅供学习研究，不构成投资建议", align="C")
+        self.ln(2)
 
     def add_cover(self) -> None:
         self.add_page()
@@ -231,7 +229,7 @@ class _ReportPDF(FPDF):
 
         self._use_font("B", 24)
         self.set_text_color(255, 90, 31)
-        self._safe_multi_cell(0, 12, "A股多Agent投研分析报告", align="C")
+        self._safe_multi_cell(0, 12, "A股AI投研分析报告", align="C")
         self.ln(20)
 
         self._use_font("B", 36)
@@ -256,9 +254,8 @@ class _ReportPDF(FPDF):
         self.set_text_color(120, 120, 120)
         self._safe_multi_cell(
             0, 5,
-            "免责声明: 本报告由 AI 多 Agent 系统自动生成, 仅供学习研究与技术演示, "
-            "不构成任何投资建议。投资决策请咨询持牌专业机构。"
-            "使用本报告所产生的任何损失由使用者自行承担。",
+            "本报告由 AI 系统自动生成。",
+
             align="C",
         )
 
