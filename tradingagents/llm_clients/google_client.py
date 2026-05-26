@@ -1,4 +1,5 @@
 from typing import Any, Optional
+import os
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -28,32 +29,28 @@ class GoogleClient(BaseLLMClient):
         self.warn_if_unknown_model()
         llm_kwargs = {"model": self.model}
 
-        if self.base_url:
-            llm_kwargs["base_url"] = self.base_url
+        resolved_base = self.base_url or os.environ.get("BASE_URL")
+        if resolved_base:
+            llm_kwargs["base_url"] = resolved_base
 
         for key in ("timeout", "max_retries", "callbacks", "http_client", "http_async_client"):
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
 
-        # Unified api_key maps to provider-specific google_api_key
         google_api_key = self.kwargs.get("api_key") or self.kwargs.get("google_api_key")
+        if not google_api_key:
+            google_api_key = os.environ.get("API_KEY")
         if google_api_key:
             llm_kwargs["google_api_key"] = google_api_key
 
-        # Map thinking_level to appropriate API param based on model
-        # Gemini 3 Pro: low, high
-        # Gemini 3 Flash: minimal, low, medium, high
-        # Gemini 2.5: thinking_budget (0=disable, -1=dynamic)
         thinking_level = self.kwargs.get("thinking_level")
         if thinking_level:
             model_lower = self.model.lower()
             if "gemini-3" in model_lower:
-                # Gemini 3 Pro doesn't support "minimal", use "low" instead
                 if "pro" in model_lower and thinking_level == "minimal":
                     thinking_level = "low"
                 llm_kwargs["thinking_level"] = thinking_level
             else:
-                # Gemini 2.5: map to thinking_budget
                 llm_kwargs["thinking_budget"] = -1 if thinking_level == "high" else 0
 
         return NormalizedChatGoogleGenerativeAI(**llm_kwargs)

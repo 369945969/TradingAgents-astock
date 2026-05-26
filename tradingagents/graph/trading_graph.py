@@ -91,6 +91,10 @@ class TradingAgentsGraph:
         if self.callbacks:
             llm_kwargs["callbacks"] = self.callbacks
 
+        # Pass unified api_key from config
+        if self.config.get("api_key"):
+            llm_kwargs["api_key"] = self.config["api_key"]
+
         deep_client = create_llm_client(
             provider=self.config["llm_provider"],
             model=self.config["deep_think_llm"],

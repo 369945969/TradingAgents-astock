@@ -1,4 +1,4 @@
-"""Sidebar: stock input, LLM config, and history list."""
+"""Sidebar: stock input, config info, and history list."""
 
 from __future__ import annotations
 
@@ -6,24 +6,22 @@ from datetime import date
 
 import streamlit as st
 
-from tradingagents.llm_clients.model_catalog import MODEL_OPTIONS
+from tradingagents.default_config import DEFAULT_CONFIG
 from web.history import get_history
 
-# Provider display names in recommended order
-_PROVIDERS: list[tuple[str, str]] = [
-    ("DeepSeek", "deepseek"),
-    ("MiniMax（推荐·国内直连）", "minimax"),
-    ("通义千问 Qwen", "qwen"),
-    ("智谱 GLM", "glm"),
-    ("OpenAI", "openai"),
-    ("Anthropic", "anthropic"),
-    ("Google Gemini", "google"),
-    ("xAI Grok", "xai"),
-    ("Ollama（本地）", "ollama"),
-]
-
-_PROVIDER_DISPLAY = [name for name, _ in _PROVIDERS]
-_PROVIDER_KEYS = [key for _, key in _PROVIDERS]
+_PROVIDER_NAMES = {
+    "deepseek": "DeepSeek",
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "google": "Google Gemini",
+    "xai": "xAI Grok",
+    "qwen": "通义千问 Qwen",
+    "glm": "智谱 GLM",
+    "minimax": "MiniMax",
+    "ollama": "Ollama（本地）",
+    "openrouter": "OpenRouter",
+    "local": "本地模型",
+}
 
 
 def _resolve_user_input(raw: str) -> tuple[str, str | None]:
@@ -41,50 +39,39 @@ def _resolve_user_input(raw: str) -> tuple[str, str | None]:
         return "", str(e)
 
 
-def _render_llm_config() -> None:
-    """Render LLM provider and model selection controls."""
+def _render_config_info() -> None:
+    """Render current LLM configuration (read from .env)."""
+    provider = DEFAULT_CONFIG["llm_provider"]
+    provider_name = _PROVIDER_NAMES.get(provider, provider)
+    quick_model = DEFAULT_CONFIG["quick_think_llm"]
+    deep_model = DEFAULT_CONFIG["deep_think_llm"]
 
-    provider_idx = st.selectbox(
-        "LLM 供应商",
-        range(len(_PROVIDERS)),
-        format_func=lambda i: _PROVIDER_DISPLAY[i],
-        key="llm_provider_idx",
-        help="选择你配置了 API Key 的供应商",
+    st.markdown(
+        f"""
+        <div style="
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+        ">
+            <div style="color: #888; margin-bottom: 6px;">当前模型配置</div>
+            <div style="color: #f5f1eb; margin-bottom: 4px;">
+                <span style="color: #888;">供应商：</span>{provider_name}
+            </div>
+            <div style="color: #f5f1eb; margin-bottom: 4px;">
+                <span style="color: #888;">快速模型：</span>{quick_model}
+            </div>
+            <div style="color: #f5f1eb;">
+                <span style="color: #888;">深度模型：</span>{deep_model}
+            </div>
+            <div style="color: #555; font-size: 0.75rem; margin-top: 8px;">
+                修改 .env 文件后重启生效
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    provider_key = _PROVIDER_KEYS[provider_idx]
-    st.session_state["llm_provider"] = provider_key
-
-    if provider_key in MODEL_OPTIONS:
-        quick_options = MODEL_OPTIONS[provider_key]["quick"]
-        deep_options = MODEL_OPTIONS[provider_key]["deep"]
-
-        quick_labels = [label for label, _ in quick_options]
-        quick_values = [value for _, value in quick_options]
-        deep_labels = [label for label, _ in deep_options]
-        deep_values = [value for _, value in deep_options]
-
-        quick_idx = st.selectbox(
-            "快速思考模型",
-            range(len(quick_options)),
-            format_func=lambda i: quick_labels[i],
-            key="quick_model_idx",
-            help="用于常规分析任务，速度优先",
-        )
-        st.session_state["quick_think_llm"] = quick_values[quick_idx]
-
-        deep_idx = st.selectbox(
-            "深度思考模型",
-            range(len(deep_options)),
-            format_func=lambda i: deep_labels[i],
-            key="deep_model_idx",
-            help="用于辩论/决策等需要深度推理的任务",
-        )
-        st.session_state["deep_think_llm"] = deep_values[deep_idx]
-    else:
-        custom_quick = st.text_input("快速思考模型 ID", key="custom_quick_model")
-        custom_deep = st.text_input("深度思考模型 ID", key="custom_deep_model")
-        st.session_state["quick_think_llm"] = custom_quick
-        st.session_state["deep_think_llm"] = custom_deep
 
 
 def render_sidebar() -> None:
@@ -122,7 +109,7 @@ def render_sidebar() -> None:
     )
 
     with st.expander("⚙️ 模型配置", expanded=False):
-        _render_llm_config()
+        _render_config_info()
 
     tracker = st.session_state.get("tracker")
     is_busy = tracker is not None and tracker.is_running

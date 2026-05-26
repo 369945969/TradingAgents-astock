@@ -106,20 +106,8 @@ class DeepSeekChatOpenAI(NormalizedChatOpenAI):
 # Kwargs forwarded from user config to ChatOpenAI
 _PASSTHROUGH_KWARGS = (
     "timeout", "max_retries", "reasoning_effort",
-    "api_key", "callbacks", "http_client", "http_async_client",
+    "callbacks", "http_client", "http_async_client",
 )
-
-# Provider base URLs and API key env vars
-_PROVIDER_CONFIG = {
-    "xai": ("https://api.x.ai/v1", "XAI_API_KEY"),
-    "deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY"),
-    "qwen": ("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "DASHSCOPE_API_KEY"),
-    "qwen-openai": ("http://76.13.11.164:8083/v1/", "QWEN_OPENAI_API_KEY"),
-    "glm": ("https://api.z.ai/api/paas/v4/", "ZHIPU_API_KEY"),
-    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
-    "ollama": ("http://localhost:11434/v1", None),
-    "minimax": ("https://api.minimax.chat/v1", "MINIMAX_API_KEY"),
-}
 
 
 class OpenAIClient(BaseLLMClient):
@@ -141,30 +129,34 @@ class OpenAIClient(BaseLLMClient):
         super().__init__(model, base_url, **kwargs)
         self.provider = provider.lower()
 
+    def _resolve_base_url(self) -> Optional[str]:
+        """Resolve base URL: explicit arg > unified BASE_URL env var."""
+        if self.base_url:
+            return self.base_url
+        return os.environ.get("BASE_URL")
+
+    def _resolve_api_key(self) -> Optional[str]:
+        """Resolve API key: explicit kwarg > unified API_KEY env var."""
+        if "api_key" in self.kwargs and self.kwargs["api_key"]:
+            return self.kwargs["api_key"]
+        if self.provider == "ollama":
+            return "ollama"
+        return os.environ.get("API_KEY")
+
     def get_llm(self) -> Any:
         """Return configured ChatOpenAI instance."""
         self.warn_if_unknown_model()
         llm_kwargs = {"model": self.model}
 
-        # Provider-specific base URL and auth. An explicit base_url on the
-        # client (e.g. a corporate proxy) takes precedence over the
-        # provider default so users can route through their own gateway.
-        if self.provider in _PROVIDER_CONFIG:
-            default_base, api_key_env = _PROVIDER_CONFIG[self.provider]
-            # Check for provider-specific BASE_URL env var first
-            base_url_env = f"{self.provider.upper()}_BASE_URL"
-            env_base_url = os.environ.get(base_url_env)
-            llm_kwargs["base_url"] = self.base_url or env_base_url or default_base
-            if api_key_env:
-                api_key = os.environ.get(api_key_env)
-                if api_key:
-                    llm_kwargs["api_key"] = api_key
-                else:
-                    print(f"[OpenAIClient] Warning: API key environment variable '{api_key_env}' not set for provider '{self.provider}'")
-            else:
-                llm_kwargs["api_key"] = "ollama"
-        elif self.base_url:
-            llm_kwargs["base_url"] = self.base_url
+        base_url = self._resolve_base_url()
+        if base_url:
+            llm_kwargs["base_url"] = base_url
+
+        api_key = self._resolve_api_key()
+        if api_key:
+            llm_kwargs["api_key"] = api_key
+        elif self.provider != "openai":
+            print(f"[OpenAIClient] Warning: No API key found for provider '{self.provider}'")
 
         # Forward user-provided kwargs
         for key in _PASSTHROUGH_KWARGS:
@@ -179,14 +171,14 @@ class OpenAIClient(BaseLLMClient):
         # DeepSeek's thinking-mode quirks live in their own subclass so the
         # base NormalizedChatOpenAI stays free of provider-specific branches.
         chat_cls = DeepSeekChatOpenAI if self.provider == "deepseek" else NormalizedChatOpenAI
-        
+
         # Log LLM configuration for debugging
         print(f"[OpenAIClient] Creating LLM client for provider: {self.provider}")
         print(f"[OpenAIClient] Model: {self.model}")
         print(f"[OpenAIClient] Base URL: {llm_kwargs.get('base_url')}")
         print(f"[OpenAIClient] API Key set: {'Yes' if llm_kwargs.get('api_key') else 'No'}")
         print(f"[OpenAIClient] Using class: {chat_cls.__name__}")
-        
+
         return chat_cls(**llm_kwargs)
 
     def validate_model(self) -> bool:

@@ -1,4 +1,5 @@
 from typing import Any, Optional
+import os
 
 from langchain_anthropic import ChatAnthropic
 
@@ -34,12 +35,18 @@ class AnthropicClient(BaseLLMClient):
         self.warn_if_unknown_model()
         llm_kwargs = {"model": self.model}
 
-        if self.base_url:
-            llm_kwargs["base_url"] = self.base_url
+        resolved_base = self.base_url or os.environ.get("BASE_URL")
+        if resolved_base:
+            llm_kwargs["base_url"] = resolved_base
 
         for key in _PASSTHROUGH_KWARGS:
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
+
+        if "api_key" not in llm_kwargs:
+            api_key = os.environ.get("API_KEY")
+            if api_key:
+                llm_kwargs["api_key"] = api_key
 
         return NormalizedChatAnthropic(**llm_kwargs)
 
