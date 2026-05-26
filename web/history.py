@@ -46,6 +46,7 @@ def extract_signal(state: dict[str, Any]) -> str:
     for field in (
         "final_trade_decision",
         "trader_investment_decision",
+        "trader_investment_plan",
         "investment_plan",
     ):
         text = state.get(field, "")

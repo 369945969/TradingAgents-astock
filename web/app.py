@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import textwrap
 import time
 from pathlib import Path
 
@@ -195,8 +196,7 @@ elif tracker and tracker.error:
         st.rerun()
 
 else:
-    st.markdown(
-        """
+    welcome_html = textwrap.dedent("""
         <div style="
             display: flex;
             flex-direction: column;
@@ -223,14 +223,13 @@ else:
                 ← 在左侧输入股票代码，开始分析
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """).strip()
+    st.markdown(welcome_html, unsafe_allow_html=True)
 
     history = get_history()
     if history:
         st.markdown(
-            '<div style="margin:1.5rem 0 0.8rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">历史记录</div>',
+            textwrap.dedent('<div style="margin:1.5rem 0 0.8rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">历史记录</div>'),
             unsafe_allow_html=True,
         )
         cols_per_row = 4
@@ -239,11 +238,10 @@ else:
             cols = st.columns(len(row))
             for col, entry in zip(cols, row):
                 t, d = entry["ticker"], entry["date"]
-                col.markdown(
-                    f"""
+                card_html = textwrap.dedent(f"""
                     <div style="
                         background: #111;
-                        border: 1px solid #222;
+                        border: 1px solid #2a2a2a;
                         border-radius: 8px;
                         padding: 12px;
                         text-align: center;
@@ -251,9 +249,8 @@ else:
                         <div style="font-size:1rem; font-weight:700; color:#f5f1eb;">{t}</div>
                         <div style="font-size:0.75rem; color:#666; margin-top:4px;">{d}</div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                """).strip()
+                col.markdown(card_html, unsafe_allow_html=True)
                 if col.button("查看", key=f"hist_{t}_{d}", use_container_width=True):
                     st.session_state["viewing_history"] = entry["path"]
                     st.session_state["start_analysis"] = None

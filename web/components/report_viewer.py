@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import textwrap
 from typing import Any
 
 import streamlit as st
@@ -12,6 +13,12 @@ from web.pdf_export import generate_pdf
 
 def _strip_think(text: str) -> str:
     return re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL).strip()
+
+
+def _clean_html(html: str) -> str:
+    """Remove newlines and collapse whitespace to prevent Markdown code block interpretation."""
+    html = html.replace("\n", " ")
+    return re.sub(r"\s+", " ", html).strip()
 
 
 def _signal_style(signal: str) -> tuple[str, str]:
@@ -46,8 +53,7 @@ def _render_signal_card(signal: str, ticker: str, trade_date: str, elapsed: floa
         m, s = divmod(int(elapsed), 60)
         stats_html = f'<div style="font-size:0.85rem; color:#888; margin-top:0.3rem;">耗时 {m}:{s:02d}</div>'
 
-    st.markdown(
-        f"""
+    html = _clean_html(f"""
         <div style="
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             border: 1px solid #2a2a4a;
@@ -77,9 +83,8 @@ def _render_signal_card(signal: str, ticker: str, trade_date: str, elapsed: floa
                 </div>
             </div>
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """)
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def _render_analyst_grid(final_state: dict[str, Any]) -> None:
@@ -99,8 +104,7 @@ def _render_analyst_grid(final_state: dict[str, Any]) -> None:
                 bg = "#0a0a0a"
                 border = "#1a1a1a"
                 icon_color = "#333"
-            col.markdown(
-                f"""
+            col_html = _clean_html(f"""
                 <div style="
                     background:{bg};
                     border:1px solid {border};
@@ -112,9 +116,8 @@ def _render_analyst_grid(final_state: dict[str, Any]) -> None:
                     <div style="font-size:0.7rem; color:#555; margin-top:2px;">{desc}</div>
                     <div style="font-size:0.7rem; color:#22c55e; margin-top:8px;">{'✓ 已完成' if has_content else '—'}</div>
                 </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            """)
+            col.markdown(col_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -130,8 +133,7 @@ def _render_debate(final_state: dict[str, Any]) -> None:
     inv_plan = final_state.get("investment_plan", "")
     if inv_plan:
         st.markdown("#### 👔 最终投资建议")
-        st.markdown(
-            f"""
+        plan_html = textwrap.dedent(f"""
             <div style="
                 background: #111;
                 border: 1px solid #2a2a2a;
@@ -141,9 +143,8 @@ def _render_debate(final_state: dict[str, Any]) -> None:
             ">
                 {_strip_think(str(inv_plan))}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        """).strip()
+        st.markdown(plan_html, unsafe_allow_html=True)
 
     debate = final_state.get("investment_debate_state")
     if debate and isinstance(debate, dict):
@@ -156,11 +157,10 @@ def _render_debate(final_state: dict[str, Any]) -> None:
         with tab_judge:
             st.markdown(_strip_think(debate.get("judge_decision", "") or "无数据"))
 
-    trader_decision = final_state.get("trader_investment_decision", "")
+    trader_decision = final_state.get("trader_investment_decision") or final_state.get("trader_investment_plan")
     if trader_decision:
         st.markdown("#### 💹 交易员决策")
-        st.markdown(
-            f"""
+        trader_html = textwrap.dedent(f"""
             <div style="
                 background: #111;
                 border: 1px solid #2a2a2a;
@@ -169,9 +169,8 @@ def _render_debate(final_state: dict[str, Any]) -> None:
             ">
                 {_strip_think(str(trader_decision))}
             </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        """).strip()
+        st.markdown(trader_html, unsafe_allow_html=True)
 
 
 def _render_risk(final_state: dict[str, Any]) -> None:
