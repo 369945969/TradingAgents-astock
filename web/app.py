@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import textwrap
 import time
@@ -24,6 +25,12 @@ from web.components.sidebar import render_sidebar  # noqa: E402
 from web.history import extract_signal, get_history, load_analysis  # noqa: E402
 from web.progress import ProgressTracker  # noqa: E402
 from web.runner import run_analysis_in_thread  # noqa: E402
+
+def _clean_html(html: str) -> str:
+    """Remove newlines and collapse whitespace to prevent Markdown code block interpretation."""
+    html = html.replace("\n", " ")
+    return re.sub(r"\s+", " ", html).strip()
+
 
 # ── Page config ──────────────────────────────────────────────────────────────
 
@@ -196,7 +203,7 @@ elif tracker and tracker.error:
         st.rerun()
 
 else:
-    welcome_html = textwrap.dedent("""
+    welcome_html = _clean_html("""
         <div style="
             display: flex;
             flex-direction: column;
@@ -223,13 +230,13 @@ else:
                 ← 在左侧输入股票代码，开始分析
             </div>
         </div>
-    """).strip()
+    """)
     st.markdown(welcome_html, unsafe_allow_html=True)
 
     history = get_history()
     if history:
         st.markdown(
-            textwrap.dedent('<div style="margin:1.5rem 0 0.8rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">历史记录</div>'),
+            _clean_html('<div style="margin:1.5rem 0 0.8rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">历史记录</div>'),
             unsafe_allow_html=True,
         )
         cols_per_row = 4
@@ -238,7 +245,7 @@ else:
             cols = st.columns(len(row))
             for col, entry in zip(cols, row):
                 t, d = entry["ticker"], entry["date"]
-                card_html = textwrap.dedent(f"""
+                card_html = _clean_html(f"""
                     <div style="
                         background: #111;
                         border: 1px solid #2a2a2a;
@@ -249,7 +256,7 @@ else:
                         <div style="font-size:1rem; font-weight:700; color:#f5f1eb;">{t}</div>
                         <div style="font-size:0.75rem; color:#666; margin-top:4px;">{d}</div>
                     </div>
-                """).strip()
+                """)
                 col.markdown(card_html, unsafe_allow_html=True)
                 if col.button("查看", key=f"hist_{t}_{d}", use_container_width=True):
                     st.session_state["viewing_history"] = entry["path"]

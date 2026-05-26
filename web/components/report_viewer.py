@@ -133,7 +133,7 @@ def _render_debate(final_state: dict[str, Any]) -> None:
     inv_plan = final_state.get("investment_plan", "")
     if inv_plan:
         st.markdown("#### 👔 最终投资建议")
-        plan_html = textwrap.dedent(f"""
+        plan_html = _clean_html(f"""
             <div style="
                 background: #111;
                 border: 1px solid #2a2a2a;
@@ -143,7 +143,7 @@ def _render_debate(final_state: dict[str, Any]) -> None:
             ">
                 {_strip_think(str(inv_plan))}
             </div>
-        """).strip()
+        """)
         st.markdown(plan_html, unsafe_allow_html=True)
 
     debate = final_state.get("investment_debate_state")
@@ -160,7 +160,7 @@ def _render_debate(final_state: dict[str, Any]) -> None:
     trader_decision = final_state.get("trader_investment_decision") or final_state.get("trader_investment_plan")
     if trader_decision:
         st.markdown("#### 💹 交易员决策")
-        trader_html = textwrap.dedent(f"""
+        trader_html = _clean_html(f"""
             <div style="
                 background: #111;
                 border: 1px solid #2a2a2a;
@@ -169,7 +169,7 @@ def _render_debate(final_state: dict[str, Any]) -> None:
             ">
                 {_strip_think(str(trader_decision))}
             </div>
-        """).strip()
+        """)
         st.markdown(trader_html, unsafe_allow_html=True)
 
 
