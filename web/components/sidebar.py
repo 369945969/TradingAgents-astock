@@ -8,6 +8,8 @@ import streamlit as st
 
 from tradingagents.default_config import DEFAULT_CONFIG
 
+from web.history import get_history
+
 _PROVIDER_NAMES = {
     "deepseek": "DeepSeek",
     "openai": "OpenAI",
@@ -80,6 +82,42 @@ def render_sidebar() -> None:
             st.session_state["viewing_history"] = None
 
     st.markdown("---")
+
+    # ── Recent History ──────────────────────────────────────────────────────────
+
+    history = get_history()
+    if history:
+        st.markdown(
+            """
+            <div style="font-size:0.7rem; color:#666; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">
+                📜 最近记录
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        
+        # Show top 8 recent entries in sidebar
+        for entry in history[:8]:
+            ticker = entry["ticker"]
+            name = entry["name"]
+            date_str = entry["date"]
+            path = entry["path"]
+            
+            # Use ticker as fallback for name
+            display_name = name if name else ticker
+            display_sub = f"{ticker} · {date_str}" if name else date_str
+            
+            label = f"{display_name} ({display_sub})"
+            if st.button(
+                label,
+                key=f"sb_hist_{ticker}_{date_str}",
+                use_container_width=True,
+            ):
+                st.session_state["viewing_history"] = path
+                st.session_state["start_analysis"] = None
+                st.rerun()
+        
+        st.markdown("---")
 
     provider = DEFAULT_CONFIG["llm_provider"]
     provider_name = _PROVIDER_NAMES.get(provider, provider)

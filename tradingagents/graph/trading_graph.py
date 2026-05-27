@@ -389,8 +389,17 @@ class TradingAgentsGraph:
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""
+        ticker = final_state["company_of_interest"]
+        stock_name = ""
+        try:
+            from tradingagents.dataflows.a_stock import get_stock_name
+            stock_name = get_stock_name(ticker)
+        except Exception:
+            pass
+
         self.log_states_dict[str(trade_date)] = {
-            "company_of_interest": final_state["company_of_interest"],
+            "company_of_interest": ticker,
+            "stock_name": stock_name,
             "trade_date": final_state["trade_date"],
             "market_report": final_state["market_report"],
             "sentiment_report": final_state["sentiment_report"],

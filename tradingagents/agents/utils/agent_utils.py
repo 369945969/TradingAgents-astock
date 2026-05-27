@@ -34,13 +34,18 @@ def get_language_instruction() -> str:
     """Return a prompt instruction for the configured output language.
 
     Returns empty string when English (default), so no extra tokens are used.
-    Only applied to user-facing agents (analysts, portfolio manager).
-    Internal debate agents stay in English for reasoning quality.
+    Applied to all agents including debate agents (bull/bear/risk debaters).
     """
     from tradingagents.dataflows.config import get_config
     lang = get_config().get("output_language", "English")
     if lang.strip().lower() == "english":
         return ""
+    
+    if "chinese" in lang.lower():
+        return (
+            " 请务必使用中文（简体）撰写整个回复，包括所有标题、专业术语的解释以及最终结论。"
+            " 严禁在回复中使用英文标题或中英文夹杂。确保语气专业且符合 A 股市场习惯。"
+        )
     return f" Write your entire response in {lang}."
 
 

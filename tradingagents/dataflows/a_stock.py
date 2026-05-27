@@ -79,29 +79,72 @@ def _build_name_code_map() -> tuple[dict[str, str], dict[str, str]]:
     if _name_to_code is not None:
         return _name_to_code, _code_to_name
 
-    from mootdx.quotes import Quotes
-
-    client = Quotes.factory(market="std")
     n2c: dict[str, str] = {}
     c2n: dict[str, str] = {}
-
-    for market in (0, 1):  # 0=SZ, 1=SH
-        stocks = client.stocks(market=market)
-        if stocks is None or stocks.empty:
-            continue
-        for _, row in stocks.iterrows():
-            code = str(row["code"]).strip()
-            name = str(row["name"]).strip()
-            if not _re.match(r"^[036]\d{5}$", code):
+    
+    try:
+        from mootdx.quotes import Quotes
+        client = Quotes.factory(market="std")
+        for market in (0, 1):  # 0=SZ, 1=SH
+            stocks = client.stocks(market=market)
+            if stocks is None or stocks.empty:
                 continue
-            clean_name = name.replace(" ", "").replace("　", "")
-            n2c[clean_name] = code
-            c2n[code] = clean_name
+            for _, row in stocks.iterrows():
+                code = str(row["code"]).strip()
+                name = str(row["name"]).strip()
+                if not _re.match(r"^[036]\d{5}$", code):
+                    continue
+                clean_name = name.replace(" ", "").replace("　", "")
+                n2c[clean_name] = code
+                c2n[code] = clean_name
+    except Exception as e:
+        logger.warning("Failed to build mootdx name-code map: %s", e)
 
     _name_to_code = n2c
     _code_to_name = c2n
     logger.info("Built stock name-code map: %d entries", len(n2c))
     return _name_to_code, _code_to_name
+
+
+_stock_name_cache: dict[str, str] = {}
+
+
+def get_stock_name(ticker: str) -> str:
+    """Return the Chinese stock name for a 6-digit A-stock code.
+
+    Uses Eastmoney push2 HTTP API and cached name-code map.
+    Returns empty string if the ticker is not found.
+    """
+    if ticker in _stock_name_cache:
+        return _stock_name_cache[ticker]
+    
+    # 1. Try Cached Map (most reliable)
+    _, c2n = _build_name_code_map()
+    if ticker in c2n:
+        _stock_name_cache[ticker] = c2n[ticker]
+        return c2n[ticker]
+
+    # 2. Try Eastmoney (HTTP)
+    try:
+        market_code = 1 if ticker.startswith("6") else 0
+        url = "http://push2.eastmoney.com/api/qt/stock/get"
+        params = {
+            "fltt": "2",
+            "invt": "2",
+            "fields": "f58",
+            "secid": f"{market_code}.{ticker}",
+        }
+        r = _requests.get(url, params=params, headers={"User-Agent": _UA}, timeout=3)
+        d = r.json().get("data", {})
+        name = d.get("f58", "")
+        if name:
+            _stock_name_cache[ticker] = name
+            return name
+    except Exception:
+        pass
+
+    _stock_name_cache[ticker] = ""
+    return ""
 
 
 def resolve_ticker(user_input: str) -> str:
@@ -163,38 +206,46 @@ def _tencent_quote(codes: list[str]) -> dict[str, dict]:
     Returns dict[code] -> {name, price, pe_ttm, pb, mcap_yi, ...}
     """
     prefixed = [f"{_get_prefix(c)}{c}" for c in codes]
-    url = "https://qt.gtimg.cn/q=" + ",".join(prefixed)
-    req = urllib.request.Request(url)
-    req.add_header("User-Agent", "Mozilla/5.0")
-    resp = urllib.request.urlopen(req, timeout=10)
-    raw = resp.read().decode("gbk")
+    url = "http://qt.gtimg.cn/q=" + ",".join(prefixed)
+    
+    try:
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "Mozilla/5.0")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            raw = resp.read().decode("gbk")
+    except Exception as e:
+        logger.warning("Tencent quote request failed: %s", e)
+        return {}
 
     result = {}
     for line in raw.strip().split(";"):
         if not line.strip() or "=" not in line or '"' not in line:
             continue
-        key = line.split("=")[0].split("_")[-1]
-        vals = line.split('"')[1].split("~")
-        if len(vals) < 53:
+        try:
+            key = line.split("=")[0].split("_")[-1]
+            vals = line.split('"')[1].split("~")
+            if len(vals) < 53:
+                continue
+            code = key[2:]  # strip sh/sz/bj prefix
+            result[code] = {
+                "name": vals[1],
+                "price": float(vals[3]) if vals[3] else 0,
+                "last_close": float(vals[4]) if vals[4] else 0,
+                "open": float(vals[5]) if vals[5] else 0,
+                "change_pct": float(vals[32]) if vals[32] else 0,
+                "high": float(vals[33]) if vals[33] else 0,
+                "low": float(vals[34]) if vals[34] else 0,
+                "turnover_pct": float(vals[38]) if vals[38] else 0,
+                "pe_ttm": float(vals[39]) if vals[39] else 0,
+                "mcap_yi": float(vals[44]) if vals[44] else 0,
+                "float_mcap_yi": float(vals[45]) if vals[45] else 0,
+                "pb": float(vals[46]) if vals[46] else 0,
+                "limit_up": float(vals[47]) if vals[47] else 0,
+                "limit_down": float(vals[48]) if vals[48] else 0,
+                "pe_static": float(vals[52]) if vals[52] else 0,
+            }
+        except (ValueError, IndexError, KeyError):
             continue
-        code = key[2:]  # strip sh/sz/bj prefix
-        result[code] = {
-            "name": vals[1],
-            "price": float(vals[3]) if vals[3] else 0,
-            "last_close": float(vals[4]) if vals[4] else 0,
-            "open": float(vals[5]) if vals[5] else 0,
-            "change_pct": float(vals[32]) if vals[32] else 0,
-            "high": float(vals[33]) if vals[33] else 0,
-            "low": float(vals[34]) if vals[34] else 0,
-            "turnover_pct": float(vals[38]) if vals[38] else 0,
-            "pe_ttm": float(vals[39]) if vals[39] else 0,
-            "mcap_yi": float(vals[44]) if vals[44] else 0,
-            "float_mcap_yi": float(vals[45]) if vals[45] else 0,
-            "pb": float(vals[46]) if vals[46] else 0,
-            "limit_up": float(vals[47]) if vals[47] else 0,
-            "limit_down": float(vals[48]) if vals[48] else 0,
-            "pe_static": float(vals[52]) if vals[52] else 0,
-        }
     return result
 
 

@@ -23,6 +23,50 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from tradingagents.agents.utils.agent_utils import get_language_instruction
+from tradingagents.dataflows.config import get_config
+
+
+def _lang() -> str:
+    return get_language_instruction()
+
+
+def _is_zh() -> bool:
+    lang = get_config().get("output_language", "English")
+    return "chinese" in lang.lower()
+
+
+def _t(en: str, zh: str) -> str:
+    return zh if _is_zh() else en
+
+
+_RATING_ZH = {
+    "Buy": "买入",
+    "Overweight": "增持",
+    "Hold": "持有",
+    "Underweight": "减持",
+    "Sell": "卖出",
+}
+
+
+def _tr(rating_val: str) -> str:
+    if _is_zh():
+        return _RATING_ZH.get(rating_val, rating_val)
+    return rating_val
+
+
+_ACTION_ZH = {
+    "Buy": "买入",
+    "Hold": "观望",
+    "Sell": "卖出",
+}
+
+
+def _ta(action_val: str) -> str:
+    if _is_zh():
+        return _ACTION_ZH.get(action_val, action_val)
+    return action_val
+
 
 # ---------------------------------------------------------------------------
 # Shared rating types
@@ -72,20 +116,20 @@ class ResearchPlan(BaseModel):
             "The investment recommendation. Exactly one of Buy / Overweight / "
             "Hold / Underweight / Sell. Reserve Hold for situations where the "
             "evidence on both sides is genuinely balanced; otherwise commit to "
-            "the side with the stronger arguments."
+            "the side with the stronger arguments." + _lang()
         ),
     )
     rationale: str = Field(
         description=(
             "Conversational summary of the key points from both sides of the "
             "debate, ending with which arguments led to the recommendation. "
-            "Speak naturally, as if to a teammate."
+            "Speak naturally, as if to a teammate." + _lang()
         ),
     )
     strategic_actions: str = Field(
         description=(
             "Concrete steps for the trader to implement the recommendation, "
-            "including position sizing guidance consistent with the rating."
+            "including position sizing guidance consistent with the rating." + _lang()
         ),
     )
 
@@ -93,11 +137,11 @@ class ResearchPlan(BaseModel):
 def render_research_plan(plan: ResearchPlan) -> str:
     """Render a ResearchPlan to markdown for storage and the trader's prompt context."""
     return "\n".join([
-        f"**Recommendation**: {plan.recommendation.value}",
+        f"**{_t('Recommendation', '投资建议')}**: {_tr(plan.recommendation.value)}",
         "",
-        f"**Rationale**: {plan.rationale}",
+        f"**{_t('Rationale', '逻辑阐述')}**: {plan.rationale}",
         "",
-        f"**Strategic Actions**: {plan.strategic_actions}",
+        f"**{_t('Strategic Actions', '战略行动')}**: {plan.strategic_actions}",
     ])
 
 
@@ -116,12 +160,12 @@ class TraderProposal(BaseModel):
     """
 
     action: TraderAction = Field(
-        description="The transaction direction. Exactly one of Buy / Hold / Sell.",
+        description="The transaction direction. Exactly one of Buy / Hold / Sell." + _lang(),
     )
     reasoning: str = Field(
         description=(
             "The case for this action, anchored in the analysts' reports and "
-            "the research plan. Two to four sentences."
+            "the research plan. Two to four sentences." + _lang()
         ),
     )
     entry_price: Optional[float] = Field(
@@ -134,7 +178,7 @@ class TraderProposal(BaseModel):
     )
     position_sizing: Optional[str] = Field(
         default=None,
-        description="Optional sizing guidance, e.g. '5% of portfolio'.",
+        description="Optional sizing guidance, e.g. '5% of portfolio'." + _lang(),
     )
 
 
@@ -146,19 +190,21 @@ def render_trader_proposal(proposal: TraderProposal) -> str:
     and any external code that greps for it.
     """
     parts = [
-        f"**Action**: {proposal.action.value}",
+        f"**{_t('Action', '交易操作')}**: {_ta(proposal.action.value)}",
         "",
-        f"**Reasoning**: {proposal.reasoning}",
+        f"**{_t('Reasoning', '决策理由')}**: {proposal.reasoning}",
     ]
     if proposal.entry_price is not None:
-        parts.extend(["", f"**Entry Price**: {proposal.entry_price}"])
+        parts.extend(["", f"**{_t('Entry Price', '入场价格')}**: {proposal.entry_price}"])
     if proposal.stop_loss is not None:
-        parts.extend(["", f"**Stop Loss**: {proposal.stop_loss}"])
+        parts.extend(["", f"**{_t('Stop Loss', '止损价格')}**: {proposal.stop_loss}"])
     if proposal.position_sizing:
-        parts.extend(["", f"**Position Sizing**: {proposal.position_sizing}"])
+        parts.extend(["", f"**{_t('Position Sizing', '仓位建议')}**: {proposal.position_sizing}"])
+    
+    final_label = _t("FINAL TRANSACTION PROPOSAL", "最终交易建议")
     parts.extend([
         "",
-        f"FINAL TRANSACTION PROPOSAL: **{proposal.action.value.upper()}**",
+        f"{final_label}: **{_ta(proposal.action.value).upper()}**",
     ])
     return "\n".join(parts)
 
@@ -180,20 +226,20 @@ class PortfolioDecision(BaseModel):
     rating: PortfolioRating = Field(
         description=(
             "The final position rating. Exactly one of Buy / Overweight / Hold / "
-            "Underweight / Sell, picked based on the analysts' debate."
+            "Underweight / Sell, picked based on the analysts' debate." + _lang()
         ),
     )
     executive_summary: str = Field(
         description=(
             "A concise action plan covering entry strategy, position sizing, "
-            "key risk levels, and time horizon. Two to four sentences."
+            "key risk levels, and time horizon. Two to four sentences." + _lang()
         ),
     )
     investment_thesis: str = Field(
         description=(
             "Detailed reasoning anchored in specific evidence from the analysts' "
             "debate. If prior lessons are referenced in the prompt context, "
-            "incorporate them; otherwise rely solely on the current analysis."
+            "incorporate them; otherwise rely solely on the current analysis." + _lang()
         ),
     )
     price_target: Optional[float] = Field(
@@ -202,7 +248,7 @@ class PortfolioDecision(BaseModel):
     )
     time_horizon: Optional[str] = Field(
         default=None,
-        description="Optional recommended holding period, e.g. '3-6 months'.",
+        description="Optional recommended holding period, e.g. '3-6 months'." + _lang(),
     )
 
 
@@ -215,14 +261,14 @@ def render_pm_decision(decision: PortfolioDecision) -> str:
     parsers and the report writers already handle.
     """
     parts = [
-        f"**Rating**: {decision.rating.value}",
+        f"**{_t('Rating', '最终评级')}**: {_tr(decision.rating.value)}",
         "",
-        f"**Executive Summary**: {decision.executive_summary}",
+        f"**{_t('Executive Summary', '执行摘要')}**: {decision.executive_summary}",
         "",
-        f"**Investment Thesis**: {decision.investment_thesis}",
+        f"**{_t('Investment Thesis', '投资逻辑')}**: {decision.investment_thesis}",
     ]
     if decision.price_target is not None:
-        parts.extend(["", f"**Price Target**: {decision.price_target}"])
+        parts.extend(["", f"**{_t('Price Target', '目标价格')}**: {decision.price_target}"])
     if decision.time_horizon:
-        parts.extend(["", f"**Time Horizon**: {decision.time_horizon}"])
+        parts.extend(["", f"**{_t('Time Horizon', '投资周期')}**: {decision.time_horizon}"])
     return "\n".join(parts)

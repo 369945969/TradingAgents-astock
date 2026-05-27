@@ -45,8 +45,17 @@ _ANALYST_SECTIONS = [
 ]
 
 
-def _render_signal_card(signal: str, ticker: str, trade_date: str, elapsed: float | None = None) -> None:
+def _render_signal_card(signal: str, ticker: str, trade_date: str, elapsed: float | None = None, stock_name: str = "") -> None:
     color, cn_signal = _signal_style(signal)
+
+    if not stock_name:
+        try:
+            from tradingagents.dataflows.a_stock import get_stock_name
+            stock_name = get_stock_name(ticker)
+        except Exception:
+            pass
+
+    ticker_display = f"{stock_name}({ticker})" if stock_name else ticker
 
     stats_html = ""
     if elapsed is not None:
@@ -63,12 +72,12 @@ def _render_signal_card(signal: str, ticker: str, trade_date: str, elapsed: floa
         ">
             <div style="display:flex; align-items:center; justify-content:space-between;">
                 <div style="flex:1;">
-                    <div style="font-size:0.7rem; color:#666; text-transform:uppercase; letter-spacing:2px;">Trading Signal</div>
+                    <div style="font-size:0.7rem; color:#666; text-transform:uppercase; letter-spacing:2px;">交易信号 (Trading Signal)</div>
                     <div style="font-size:3rem; font-weight:900; color:{color}; margin:0.2rem 0; line-height:1.1;">
                         {signal.upper()}
                     </div>
                     <div style="font-size:1rem; color:#aaa;">
-                        {ticker} · {trade_date}
+                        {ticker_display} · {trade_date}
                     </div>
                     {stats_html}
                 </div>
@@ -223,7 +232,8 @@ def render_report(
     signal: str,
     elapsed: float | None = None,
 ) -> None:
-    _render_signal_card(signal, ticker, trade_date, elapsed)
+    stock_name = final_state.get("stock_name", "")
+    _render_signal_card(signal, ticker, trade_date, elapsed, stock_name=stock_name)
 
     tab_analysts, tab_debate, tab_risk, tab_export = st.tabs(
         ["📊 分析师报告", "⚔️ 辩论与决策", "🛡️ 风控评估", "📥 导出"]

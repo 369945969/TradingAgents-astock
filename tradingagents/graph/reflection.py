@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from tradingagents.agents.utils.agent_utils import get_language_instruction
+
 
 class Reflector:
     """Handles reflection on trading decisions."""
@@ -26,6 +28,7 @@ class Reflector:
             "3. One concrete lesson to apply to the next similar analysis.\n\n"
             "Be specific and terse. Your output will be stored verbatim in a decision log "
             "and re-read by future analysts, so every word must earn its place."
+            + get_language_instruction()
         )
 
     def reflect_on_final_decision(

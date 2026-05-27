@@ -462,6 +462,7 @@ def update_display(layout, spinner_text=None, stats_handler=None, start_time=Non
 
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
+    import os
     # Display ASCII art welcome message
     with open(Path(__file__).parent / "static" / "welcome.txt", "r", encoding="utf-8") as f:
         welcome_ascii = f.read()
@@ -500,68 +501,76 @@ def get_user_selections():
         return Panel(box_content, border_style="blue", padding=(1, 2))
 
     # Step 1: Ticker symbol
-    console.print(
-        create_question_box(
-            "Step 1: Ticker Symbol",
-            "Enter the exact ticker symbol to analyze, including exchange suffix when needed (examples: SPY, CNC.TO, 7203.T, 0700.HK)",
-            "SPY",
+    if not os.getenv("TICKER"):
+        console.print(
+            create_question_box(
+                "Step 1: Ticker Symbol",
+                "Enter the exact ticker symbol to analyze, including exchange suffix when needed (examples: SPY, CNC.TO, 7203.T, 0700.HK)",
+                "SPY",
+            )
         )
-    )
     selected_ticker = get_ticker()
 
     # Step 2: Analysis date
-    default_date = datetime.datetime.now().strftime("%Y-%m-%d")
-    console.print(
-        create_question_box(
-            "Step 2: Analysis Date",
-            "Enter the analysis date (YYYY-MM-DD)",
-            default_date,
+    if not os.getenv("ANALYSIS_DATE"):
+        default_date = datetime.datetime.now().strftime("%Y-%m-%d")
+        console.print(
+            create_question_box(
+                "Step 2: Analysis Date",
+                "Enter the analysis date (YYYY-MM-DD)",
+                default_date,
+            )
         )
-    )
     analysis_date = get_analysis_date()
 
     # Step 3: Output language
-    console.print(
-        create_question_box(
-            "Step 3: Output Language",
-            "Select the language for analyst reports and final decision"
+    if not os.getenv("OUTPUT_LANGUAGE"):
+        console.print(
+            create_question_box(
+                "Step 3: Output Language",
+                "Select the language for analyst reports and final decision"
+            )
         )
-    )
     output_language = ask_output_language()
 
     # Step 4: Select analysts
-    console.print(
-        create_question_box(
-            "Step 4: Analysts Team", "Select your LLM analyst agents for the analysis"
+    if not os.getenv("ANALYSTS"):
+        console.print(
+            create_question_box(
+                "Step 4: Analysts Team", "Select your LLM analyst agents for the analysis"
+            )
         )
-    )
     selected_analysts = select_analysts()
-    console.print(
-        f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
-    )
+    if not os.getenv("ANALYSTS"):
+        console.print(
+            f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
+        )
 
     # Step 5: Research depth
-    console.print(
-        create_question_box(
-            "Step 5: Research Depth", "Select your research depth level"
+    if not os.getenv("RESEARCH_DEPTH"):
+        console.print(
+            create_question_box(
+                "Step 5: Research Depth", "Select your research depth level"
+            )
         )
-    )
     selected_research_depth = select_research_depth()
 
     # Step 6: LLM Provider
-    console.print(
-        create_question_box(
-            "Step 6: LLM Provider", "Select your LLM provider"
+    if not os.getenv("LLM_PROVIDER"):
+        console.print(
+            create_question_box(
+                "Step 6: LLM Provider", "Select your LLM provider"
+            )
         )
-    )
     selected_llm_provider, backend_url = select_llm_provider()
 
     # Step 7: Thinking agents
-    console.print(
-        create_question_box(
-            "Step 7: Thinking Agents", "Select your thinking agents for analysis"
+    if not os.getenv("QUICK_THINK_LLM") or not os.getenv("DEEP_THINK_LLM"):
+        console.print(
+            create_question_box(
+                "Step 7: Thinking Agents", "Select your thinking agents for analysis"
+            )
         )
-    )
     selected_shallow_thinker = select_shallow_thinking_agent(selected_llm_provider)
     selected_deep_thinker = select_deep_thinking_agent(selected_llm_provider)
 
@@ -572,29 +581,38 @@ def get_user_selections():
 
     provider_lower = selected_llm_provider.lower()
     if provider_lower == "google":
-        console.print(
-            create_question_box(
-                "Step 8: Thinking Mode",
-                "Configure Gemini thinking mode"
+        # Check if environment variable is set for thinking level
+        thinking_level = os.getenv("GOOGLE_THINKING_LEVEL")
+        if not thinking_level:
+            console.print(
+                create_question_box(
+                    "Step 8: Thinking Mode",
+                    "Configure Gemini thinking mode"
+                )
             )
-        )
-        thinking_level = ask_gemini_thinking_config()
+            thinking_level = ask_gemini_thinking_config()
     elif provider_lower == "openai":
-        console.print(
-            create_question_box(
-                "Step 8: Reasoning Effort",
-                "Configure OpenAI reasoning effort level"
+        # Check if environment variable is set for reasoning effort
+        reasoning_effort = os.getenv("OPENAI_REASONING_EFFORT")
+        if not reasoning_effort:
+            console.print(
+                create_question_box(
+                    "Step 8: Reasoning Effort",
+                    "Configure OpenAI reasoning effort level"
+                )
             )
-        )
-        reasoning_effort = ask_openai_reasoning_effort()
+            reasoning_effort = ask_openai_reasoning_effort()
     elif provider_lower == "anthropic":
-        console.print(
-            create_question_box(
-                "Step 8: Effort Level",
-                "Configure Claude effort level"
+        # Check if environment variable is set for effort level
+        anthropic_effort = os.getenv("ANTHROPIC_EFFORT")
+        if not anthropic_effort:
+            console.print(
+                create_question_box(
+                    "Step 8: Effort Level",
+                    "Configure Claude effort level"
+                )
             )
-        )
-        anthropic_effort = ask_anthropic_effort()
+            anthropic_effort = ask_anthropic_effort()
 
     return {
         "ticker": selected_ticker,

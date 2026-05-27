@@ -55,7 +55,7 @@ def render_progress(tracker: ProgressTracker) -> None:
     post_stages = PIPELINE_STAGES[7:]
 
     st.markdown(
-        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">Analysts</div>',
+        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">分析师 (Analysts)</div>',
         unsafe_allow_html=True,
     )
 
@@ -93,7 +93,7 @@ def render_progress(tracker: ProgressTracker) -> None:
         )
 
     st.markdown(
-        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">Pipeline</div>',
+        '<div style="margin:1rem 0 0.5rem; font-size:0.8rem; color:#666; text-transform:uppercase; letter-spacing:1px;">流程阶段 (Pipeline)</div>',
         unsafe_allow_html=True,
     )
 

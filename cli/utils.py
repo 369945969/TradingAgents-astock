@@ -19,7 +19,13 @@ ANALYST_ORDER = [
 
 
 def get_ticker() -> str:
-    """Prompt the user to enter a ticker symbol."""
+    """Prompt the user to enter a ticker symbol or use environment variable."""
+    import os
+    env_ticker = os.getenv("TICKER")
+    if env_ticker:
+        console.print(f"[green]Using ticker from environment:[/green] {env_ticker}")
+        return normalize_ticker_symbol(env_ticker)
+
     ticker = questionary.text(
         f"Enter the exact ticker symbol to analyze ({TICKER_INPUT_EXAMPLES}):",
         validate=lambda x: len(x.strip()) > 0 or "Please enter a valid ticker symbol.",
@@ -44,9 +50,15 @@ def normalize_ticker_symbol(ticker: str) -> str:
 
 
 def get_analysis_date() -> str:
-    """Prompt the user to enter a date in YYYY-MM-DD format."""
+    """Prompt the user to enter a date in YYYY-MM-DD format or use environment variable."""
     import re
+    import os
     from datetime import datetime
+
+    env_date = os.getenv("ANALYSIS_DATE")
+    if env_date:
+        console.print(f"[green]Using analysis date from environment:[/green] {env_date}")
+        return env_date.strip()
 
     def validate_date(date_str: str) -> bool:
         if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
@@ -77,7 +89,19 @@ def get_analysis_date() -> str:
 
 
 def select_analysts() -> List[AnalystType]:
-    """Select analysts using an interactive checkbox."""
+    """Select analysts using an interactive checkbox or environment variable."""
+    import os
+    env_analysts = os.getenv("ANALYSTS")
+    if env_analysts:
+        analyst_values = [v.strip().lower() for v in env_analysts.split(",")]
+        selected = []
+        for display, value in ANALYST_ORDER:
+            if value.value in analyst_values:
+                selected.append(value)
+        if selected:
+            console.print(f"[green]Using analysts from environment:[/green] {', '.join(v.value for v in selected)}")
+            return selected
+
     choices = questionary.checkbox(
         "Select Your [Analysts Team]:",
         choices=[
@@ -103,7 +127,16 @@ def select_analysts() -> List[AnalystType]:
 
 
 def select_research_depth() -> int:
-    """Select research depth using an interactive selection."""
+    """Select research depth using an interactive selection or environment variable."""
+    import os
+    env_depth = os.getenv("RESEARCH_DEPTH")
+    if env_depth:
+        try:
+            depth = int(env_depth)
+            console.print(f"[green]Using research depth from environment:[/green] {depth}")
+            return depth
+        except ValueError:
+            pass
 
     # Define research depth options with their corresponding values
     DEPTH_OPTIONS = [
@@ -183,7 +216,13 @@ def _prompt_custom_model_id() -> str:
 
 
 def _select_model(provider: str, mode: str) -> str:
-    """Select a model for the given provider and mode (quick/deep)."""
+    """Select a model for the given provider and mode (quick/deep) or use environment variable."""
+    import os
+    env_model = os.getenv(f"{mode.upper()}_THINK_LLM")
+    if env_model:
+        console.print(f"[green]Using {mode} thinking model from environment:[/green] {env_model}")
+        return env_model.strip()
+
     if provider.lower() == "openrouter":
         return select_openrouter_model()
 
@@ -229,9 +268,11 @@ def select_deep_thinking_agent(provider) -> str:
     return _select_model(provider, "deep")
 
 def select_llm_provider() -> tuple[str, str | None]:
-    """Select the LLM provider and its API endpoint."""
+    """Select the LLM provider and its API endpoint or use environment variable."""
     import os
     base_url = os.getenv("BASE_URL")
+    env_provider = os.getenv("LLM_PROVIDER")
+    
     PROVIDERS = [
         ("OpenAI", "openai", base_url),
         ("Google", "google", base_url),
@@ -244,6 +285,17 @@ def select_llm_provider() -> tuple[str, str | None]:
         ("Azure OpenAI", "azure", None),
         ("Ollama", "ollama", base_url),
     ]
+
+    if env_provider:
+        env_provider_lower = env_provider.lower()
+        # Find the display name for the provider
+        for display, provider_key, url in PROVIDERS:
+            if provider_key == env_provider_lower:
+                console.print(f"[green]Using LLM provider from environment:[/green] {display}")
+                return provider_key, url
+        # If not found in our list, just return it as is
+        console.print(f"[green]Using custom LLM provider from environment:[/green] {env_provider}")
+        return env_provider_lower, base_url
 
     choice = questionary.select(
         "Select your LLM Provider:",
@@ -328,7 +380,13 @@ def ask_gemini_thinking_config() -> str | None:
 
 
 def ask_output_language() -> str:
-    """Ask for report output language."""
+    """Ask for report output language or use environment variable."""
+    import os
+    env_lang = os.getenv("OUTPUT_LANGUAGE")
+    if env_lang:
+        console.print(f"[green]Using output language from environment:[/green] {env_lang}")
+        return env_lang.strip()
+
     choice = questionary.select(
         "Select Output Language:",
         choices=[

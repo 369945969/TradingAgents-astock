@@ -245,6 +245,9 @@ else:
             cols = st.columns(len(row))
             for col, entry in zip(cols, row):
                 t, d = entry["ticker"], entry["date"]
+                n = entry.get("name", "")
+                display_name = f"{n} ({t})" if n else t
+                display_sub = d
                 card_html = _clean_html(f"""
                     <div style="
                         background: #111;
@@ -253,8 +256,8 @@ else:
                         padding: 12px;
                         text-align: center;
                     ">
-                        <div style="font-size:1rem; font-weight:700; color:#f5f1eb;">{t}</div>
-                        <div style="font-size:0.75rem; color:#666; margin-top:4px;">{d}</div>
+                        <div style="font-size:1rem; font-weight:700; color:#f5f1eb;">{display_name}</div>
+                        <div style="font-size:0.75rem; color:#666; margin-top:4px;">{display_sub}</div>
                     </div>
                 """)
                 col.markdown(card_html, unsafe_allow_html=True)
